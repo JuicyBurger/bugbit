@@ -36,7 +36,18 @@ describe('resolveActionModuleUrl', () => {
     );
   });
 
-  it('always resolves preflight from scripts/lib', () => {
+  it('prefers bundled preflight when present', () => {
+    const bundledDir = path.join(actionPath, 'dist', 'scripts', 'preflight');
+    fs.mkdirSync(bundledDir, { recursive: true });
+    const bundledFile = path.join(bundledDir, 'index.mjs');
+    fs.writeFileSync(bundledFile, 'export {};\n');
+
+    expect(resolveActionModuleUrl(actionPath, 'preflight')).toBe(
+      pathToFileURL(bundledFile).href,
+    );
+  });
+
+  it('falls back to scripts/lib when bundled preflight is absent', () => {
     const sourceFile = path.join(actionPath, 'scripts', 'lib', 'preflight.mjs');
     fs.mkdirSync(path.dirname(sourceFile), { recursive: true });
     fs.writeFileSync(sourceFile, 'export {};\n');

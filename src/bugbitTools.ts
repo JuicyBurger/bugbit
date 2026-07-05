@@ -1,6 +1,5 @@
 import type { SDKCustomTool, SDKJsonValue } from '@cursor/sdk';
 import * as core from '@actions/core';
-import { getOctokit } from '@actions/github';
 import * as fs from 'fs';
 import * as path from 'path';
 import { dynamicImport } from './dynamicImport';
@@ -68,14 +67,11 @@ export async function checkReviewPermissions(deps: BugbitToolDeps): Promise<void
 
   core.info('Checking GitHub token permissions for PR review…');
   try {
-    await assertReviewPermissions(
-      {
-        token: deps.githubToken,
-        eventPath: deps.eventPath,
-        repository: deps.repository,
-      },
-      getOctokit(deps.githubToken),
-    );
+    await assertReviewPermissions({
+      token: deps.githubToken,
+      eventPath: deps.eventPath,
+      repository: deps.repository,
+    });
   } catch (error) {
     throw new Error(formatPermissionErrorMessage(error));
   }

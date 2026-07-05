@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "bundle:scripts": "ncc build scripts/lib/operations.mjs -o dist/scripts/operations",
+    "bundle:scripts": "ncc build scripts/lib/operations.mjs -o dist/scripts/operations && ncc build scripts/lib/preflight.mjs -o dist/scripts/preflight",
     "bundle": "pnpm run build && pnpm run bundle:scripts && ncc build lib/main.js -o dist",
     "test": "jest"
   },
