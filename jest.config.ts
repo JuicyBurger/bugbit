@@ -6,6 +6,9 @@ const config: Config = {
   roots: ['<rootDir>/__tests__'],
   testMatch: ['**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json', 'mjs'],
+  moduleNameMapper: {
+    '^@actions/core$': '<rootDir>/__tests__/__mocks__/actionsCore.ts',
+  },
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
