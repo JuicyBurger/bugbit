@@ -3,12 +3,16 @@ import type { Run } from '@cursor/sdk';
 
 const HEARTBEAT_MS = 30_000;
 
+export const AGENT_TIMEOUT_MS = 45 * 60 * 1000;
+
+export const AGENT_TIMEOUT_MESSAGE = `Agent timed out after ${Math.round(AGENT_TIMEOUT_MS / 60_000)} minutes`;
+
 export async function waitForRunWithHeartbeat(
   run: Run,
   timeoutMs: number,
 ): Promise<Awaited<ReturnType<Run['wait']>>> {
   if (timeoutMs <= 0) {
-    throw new Error('Agent timed out after 45 minutes');
+    throw new Error(AGENT_TIMEOUT_MESSAGE);
   }
 
   core.info('Stream ended; waiting for run completion…');
@@ -23,7 +27,7 @@ export async function waitForRunWithHeartbeat(
 
     const timer = setTimeout(() => {
       clearInterval(heartbeat);
-      reject(new Error('Agent timed out after 45 minutes'));
+      reject(new Error(AGENT_TIMEOUT_MESSAGE));
     }, timeoutMs);
 
     run
@@ -47,6 +51,6 @@ export function remainingMs(deadlineMs: number): number {
 
 export function assertWithinDeadline(deadlineMs: number): void {
   if (remainingMs(deadlineMs) <= 0) {
-    throw new Error('Agent timed out after 45 minutes');
+    throw new Error(AGENT_TIMEOUT_MESSAGE);
   }
 }

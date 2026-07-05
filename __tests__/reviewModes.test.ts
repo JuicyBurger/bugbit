@@ -36,12 +36,13 @@ describe('validateReviewModes', () => {
 });
 
 describe('buildSkillPrompt', () => {
-  it('prefixes selected skills and appends system prompt', () => {
+  it('returns prompt and parsed modes', () => {
     const promptsDir = makePromptsDir();
     const actionPath = path.dirname(promptsDir);
 
-    const prompt = buildSkillPrompt('code-review,security-review', promptsDir, actionPath);
+    const { prompt, modes } = buildSkillPrompt('code-review, security-review', promptsDir, actionPath);
 
+    expect(modes).toEqual(['code-review', 'security-review']);
     expect(prompt.startsWith('/review\n/review-security\n\n')).toBe(true);
     expect(prompt).toContain(actionPath);
     expect(prompt).toContain('get_pr_context tool');
@@ -51,7 +52,7 @@ describe('buildSkillPrompt', () => {
     const promptsDir = makePromptsDir();
     const actionPath = path.dirname(promptsDir);
 
-    const prompt = buildSkillPrompt('simplify', promptsDir, actionPath);
+    const { prompt } = buildSkillPrompt('simplify', promptsDir, actionPath);
 
     expect(prompt.startsWith('/simplify\n\n')).toBe(true);
   });
@@ -60,7 +61,7 @@ describe('buildSkillPrompt', () => {
     const promptsDir = makePromptsDir();
     const actionPath = path.dirname(promptsDir);
 
-    const prompt = buildSkillPrompt('code-review', promptsDir, actionPath, {
+    const { prompt } = buildSkillPrompt('code-review', promptsDir, actionPath, {
       context: { number: 1 },
       diff: { files: [{ path: 'a.ts' }] },
     });

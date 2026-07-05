@@ -1,14 +1,5 @@
 import { requirePullRequest } from './event.mjs';
-
-/**
- * @param {string} repository
- */
-function parseRepo(repository) {
-  if (!repository) throw new Error('GITHUB_REPOSITORY not set');
-  const [owner, repo] = repository.split('/');
-  if (!owner || !repo) throw new Error(`Invalid repository: ${repository}`);
-  return { owner, repo };
-}
+import { createClient, parseRepo } from './octokit.mjs';
 
 export const PermissionError = class extends Error {
   /** @param {string} code @param {string} message */
@@ -95,8 +86,7 @@ function mapHttpError(status, phase) {
  * @param {import('@octokit/rest').Octokit} [octokit]
  */
 export async function assertReviewPermissions(deps, octokit = undefined) {
-  const client =
-    octokit ?? (await import('./octokit.mjs')).createClient(deps.token);
+  const client = octokit ?? createClient(deps.token);
   const pr = requirePullRequest(deps.eventPath);
   const { owner, repo } = parseRepo(deps.repository);
 

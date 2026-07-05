@@ -1,4 +1,4 @@
-import { parseUnifiedPatch, mapGitHubStatus, buildLineMap } from './parse-patch.mjs';
+import { mapPullRequestFiles, buildLineMap } from './parse-patch.mjs';
 
 /**
  * @param {string} path
@@ -40,27 +40,7 @@ export async function fetchDiffLineMap(octokit, owner, repo, pullNumber) {
     pull_number: pullNumber,
   });
 
-  const files = fileList.map((file) => {
-    const status = mapGitHubStatus(file.status);
-
-    if (status === 'deleted') {
-      return { path: file.filename, status: 'deleted' };
-    }
-
-    const entry = { path: file.filename, status };
-
-    if (status === 'renamed' && file.previous_filename) {
-      entry.previous_filename = file.previous_filename;
-    }
-
-    if (!file.patch) {
-      entry.hunks = [];
-    } else {
-      entry.hunks = parseUnifiedPatch(file.patch);
-    }
-
-    return entry;
-  });
+  const files = mapPullRequestFiles(fileList);
 
   return buildLineMap(files);
 }

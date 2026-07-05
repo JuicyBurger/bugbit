@@ -104,8 +104,6 @@ export class StreamLogger {
       case 'system':
         this.handleSystem(event);
         break;
-      default:
-        break;
     }
   }
 

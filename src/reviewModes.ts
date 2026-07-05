@@ -28,21 +28,10 @@ export function validateReviewModes(modes: string[]): void {
   }
 }
 
-function resolveActionPath(promptsDir: string, actionPath?: string): string {
-  if (actionPath) {
-    return actionPath;
-  }
-  if (process.env.GITHUB_ACTION_PATH) {
-    return process.env.GITHUB_ACTION_PATH;
-  }
-  return path.basename(promptsDir) === 'prompts' ? path.dirname(promptsDir) : promptsDir;
-}
-
-function loadSystemPrompt(promptsDir: string, actionPath?: string): string {
-  const resolvedActionPath = resolveActionPath(promptsDir, actionPath);
+function loadSystemPrompt(promptsDir: string, actionPath: string): string {
   const systemPath = path.join(promptsDir, 'system.md');
-  let systemPrompt = fs.readFileSync(systemPath, 'utf-8');
-  return systemPrompt.replaceAll('{{GITHUB_ACTION_PATH}}', resolvedActionPath);
+  const systemPrompt = fs.readFileSync(systemPath, 'utf-8');
+  return systemPrompt.replaceAll('{{GITHUB_ACTION_PATH}}', actionPath);
 }
 
 function buildPrefetchedSection(prefetched?: PrefetchedPrData): string {
@@ -62,12 +51,17 @@ function buildPrefetchedSection(prefetched?: PrefetchedPrData): string {
   return `\n\n${lines.join('\n')}`;
 }
 
+export interface SkillPromptResult {
+  prompt: string;
+  modes: string[];
+}
+
 export function buildSkillPrompt(
   modesInput: string,
   promptsDir: string,
-  actionPath?: string,
+  actionPath: string,
   prefetched?: PrefetchedPrData,
-): string {
+): SkillPromptResult {
   const modes = parseReviewModes(modesInput);
   validateReviewModes(modes);
 
@@ -76,5 +70,8 @@ export function buildSkillPrompt(
     .join('\n');
   const systemPrompt = loadSystemPrompt(promptsDir, actionPath);
 
-  return `${skillLines}\n\n${systemPrompt}${buildPrefetchedSection(prefetched)}`;
+  return {
+    prompt: `${skillLines}\n\n${systemPrompt}${buildPrefetchedSection(prefetched)}`,
+    modes,
+  };
 }

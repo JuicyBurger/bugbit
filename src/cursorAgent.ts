@@ -2,10 +2,10 @@ import { Agent, CursorAgentError, type SDKCustomTool } from '@cursor/sdk';
 import * as core from '@actions/core';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { assertWithinDeadline, remainingMs, waitForRunWithHeartbeat } from './runWait';
+import { assertWithinDeadline, AGENT_TIMEOUT_MS, remainingMs, waitForRunWithHeartbeat } from './runWait';
 import { StreamLogger, type StreamEvent } from './streamLog';
 
-export const AGENT_TIMEOUT_MS = 45 * 60 * 1000;
+export { AGENT_TIMEOUT_MS } from './runWait';
 
 export interface RunAgentOptions {
   saveStreamLog?: boolean;

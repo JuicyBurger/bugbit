@@ -60,6 +60,14 @@ function loadPreflight(actionPath: string): Promise<PreflightModule> {
   return preflightPromise;
 }
 
+function toOpsDeps(deps: BugbitToolDeps) {
+  return {
+    token: deps.githubToken,
+    eventPath: deps.eventPath,
+    repository: deps.repository,
+  };
+}
+
 export async function checkReviewPermissions(deps: BugbitToolDeps): Promise<void> {
   const { assertReviewPermissions, formatPermissionErrorMessage } = await loadPreflight(
     deps.actionPath,
@@ -76,11 +84,6 @@ export async function checkReviewPermissions(deps: BugbitToolDeps): Promise<void
     throw new Error(formatPermissionErrorMessage(error));
   }
   core.info('GitHub token permissions OK');
-}
-
-function isAuthError(error: unknown): boolean {
-  const status = (error as { status?: number })?.status;
-  return status === 401 || status === 403;
 }
 
 export function copyPermissionsToWorkspace(actionPath: string, cwd: string): void {
@@ -108,11 +111,7 @@ export interface PrefetchedPrData {
 
 export async function prefetchPrData(deps: BugbitToolDeps): Promise<PrefetchedPrData> {
   const ops = await loadOps(deps.actionPath);
-  const toolDeps = {
-    token: deps.githubToken,
-    eventPath: deps.eventPath,
-    repository: deps.repository,
-  };
+  const toolDeps = toOpsDeps(deps);
 
   core.info('Prefetching PR context and diff…');
   const context = await ops.getPrContext(toolDeps);
@@ -146,13 +145,7 @@ export function isForkPullRequest(eventPath: string): boolean {
 }
 
 export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCustomTool> {
-  const toolDeps = {
-    token: deps.githubToken,
-    eventPath: deps.eventPath,
-    repository: deps.repository,
-  };
-
-  const getOps = () => loadOps(deps.actionPath);
+  const toolDeps = toOpsDeps(deps);
 
   return {
     get_pr_context: {
@@ -165,7 +158,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
       },
       execute: async () => {
         core.info('[bugbit] get_pr_context called');
-        const ops = await getOps();
+        const ops = await loadOps(deps.actionPath);
         return (await ops.getPrContext(toolDeps)) as SDKJsonValue;
       },
     },
@@ -180,15 +173,12 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
       execute: async () => {
         core.info('[bugbit] get_diff called');
         try {
-          const ops = await getOps();
+          const ops = await loadOps(deps.actionPath);
           return (await ops.getDiff(toolDeps)) as SDKJsonValue;
         } catch (error) {
           const err = error as Error & { code?: string };
           if (err.code === 'DIFF_TOO_LARGE') {
             return { error: { code: err.code, message: err.message } } as SDKJsonValue;
-          }
-          if (isAuthError(error)) {
-            throw error;
           }
           throw error;
         }
@@ -221,17 +211,10 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
       execute: async (args) => {
         const findings = args.findings as unknown[];
         core.info(`[bugbit] post_review called with ${findings.length} finding(s)`);
-        const ops = await getOps();
-        try {
-          const result = (await ops.postReview(toolDeps, findings)) as SDKJsonValue;
-          core.info('[bugbit] post_review completed');
-          return result;
-        } catch (error) {
-          if (isAuthError(error)) {
-            throw error;
-          }
-          throw error;
-        }
+        const ops = await loadOps(deps.actionPath);
+        const result = (await ops.postReview(toolDeps, findings)) as SDKJsonValue;
+        core.info('[bugbit] post_review completed');
+        return result;
       },
     },
     post_inline_comment: {
@@ -249,7 +232,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
       },
       execute: async (args) => {
         core.info(`[bugbit] post_inline_comment called for ${args.path}:${args.line}`);
-        const ops = await getOps();
+        const ops = await loadOps(deps.actionPath);
         const result = await ops.postInlineComment(toolDeps, {
           path: args.path as string,
           line: args.line as number,

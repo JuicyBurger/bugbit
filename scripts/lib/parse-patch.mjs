@@ -66,6 +66,33 @@ export function mapGitHubStatus(status) {
 }
 
 /**
+ * @param {Array<{ filename: string, status: string, previous_filename?: string, patch?: string }>} fileList
+ */
+export function mapPullRequestFiles(fileList) {
+  return fileList.map((file) => {
+    const status = mapGitHubStatus(file.status);
+
+    if (status === 'deleted') {
+      return { path: file.filename, status: 'deleted' };
+    }
+
+    const entry = { path: file.filename, status };
+
+    if (status === 'renamed' && file.previous_filename) {
+      entry.previous_filename = file.previous_filename;
+    }
+
+    if (!file.patch) {
+      entry.hunks = [];
+    } else {
+      entry.hunks = parseUnifiedPatch(file.patch);
+    }
+
+    return entry;
+  });
+}
+
+/**
  * @param {Array<{ path: string, status: string, hunks?: Array<{ lines: Array<{ type: string, newLine?: number }> }> }>} files
  * @returns {Map<string, Set<number>>}
  */

@@ -1,8 +1,17 @@
 import { readFileSync } from 'node:fs';
 
+let cachedEventPath;
+/** @type {unknown} */
+let cachedEvent;
+
 export function loadEvent(eventPath = process.env.GITHUB_EVENT_PATH) {
   if (!eventPath) throw new Error('GITHUB_EVENT_PATH not set');
-  return JSON.parse(readFileSync(eventPath, 'utf8'));
+  if (cachedEventPath === eventPath && cachedEvent !== undefined) {
+    return cachedEvent;
+  }
+  cachedEvent = JSON.parse(readFileSync(eventPath, 'utf8'));
+  cachedEventPath = eventPath;
+  return cachedEvent;
 }
 
 export function requirePullRequest(eventPath = process.env.GITHUB_EVENT_PATH) {
@@ -14,7 +23,3 @@ export function requirePullRequest(eventPath = process.env.GITHUB_EVENT_PATH) {
   return pr;
 }
 
-export function getPullRequestFromEvent() {
-  const event = loadEvent();
-  return event.pull_request ?? null;
-}

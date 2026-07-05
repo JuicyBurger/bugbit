@@ -7,7 +7,7 @@ import {
 } from './artifactUpload';
 import { resolveActionPath } from './actionPath';
 import { assertRepoCheckedOut } from './checkCheckout';
-import { buildSkillPrompt, parseReviewModes } from './reviewModes';
+import { buildSkillPrompt } from './reviewModes';
 import {
   checkReviewPermissions,
   copyPermissionsToWorkspace,
@@ -72,8 +72,7 @@ async function run(): Promise<void> {
     const promptsDir = path.join(actionPath, 'prompts');
 
     const prefetched = await prefetchPrData(toolDeps);
-    const prompt = buildSkillPrompt(modesInput, promptsDir, actionPath, prefetched);
-    const modes = parseReviewModes(modesInput);
+    const { prompt, modes } = buildSkillPrompt(modesInput, promptsDir, actionPath, prefetched);
 
     const customTools = createBugbitTools(toolDeps);
 
