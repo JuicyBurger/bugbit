@@ -1,9 +1,9 @@
-import github from '@actions/github';
+import { getOctokit } from '@actions/github';
 
 export function getClient() {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw new Error('GITHUB_TOKEN not set');
-  return github.getOctokit(token);
+  return getOctokit(token);
 }
 
 export function getRepo() {
