@@ -1,16 +1,15 @@
 #!/usr/bin/env node
-import { requirePullRequest } from './lib/event.mjs';
+import { getPrContext } from './lib/operations.mjs';
 import { printJson, fail } from './lib/errors.mjs';
 
+const deps = {
+  token: process.env.GITHUB_TOKEN,
+  eventPath: process.env.GITHUB_EVENT_PATH,
+  repository: process.env.GITHUB_REPOSITORY,
+};
+
 try {
-  const pr = requirePullRequest();
-  printJson({
-    number: pr.number,
-    headRef: pr.head.ref,
-    baseRef: pr.base.ref,
-    headSha: pr.head.sha,
-    baseSha: pr.base.sha,
-  });
+  printJson(await getPrContext(deps));
 } catch (e) {
   fail('PR_CONTEXT_ERROR', e.message);
 }
