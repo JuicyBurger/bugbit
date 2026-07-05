@@ -5,7 +5,7 @@ const config: Config = {
   testEnvironment: 'node',
   roots: ['<rootDir>/__tests__'],
   testMatch: ['**/*.test.ts'],
-  moduleFileExtensions: ['ts', 'js', 'json'],
+  moduleFileExtensions: ['ts', 'js', 'json', 'mjs'],
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',
@@ -16,6 +16,7 @@ const config: Config = {
         },
       },
     ],
+    '^.+\\.mjs$': '<rootDir>/jest.mjs-transformer.cjs',
   },
 };
 
