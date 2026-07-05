@@ -49,7 +49,10 @@ export async function runAgent(
     core.info(`Started run ${run.id} (agent ${agent.agentId})`);
 
     const streamLogPath = options.saveStreamLog
-      ? path.join(os.tmpdir(), `bugbit-stream-${run.id}.jsonl`)
+      ? path.join(
+          process.env.RUNNER_TEMP ?? os.tmpdir(),
+          `bugbit-stream-${run.id}.jsonl`,
+        )
       : undefined;
 
     logger = new StreamLogger({

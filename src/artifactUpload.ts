@@ -17,14 +17,20 @@ export function artifactUploadErrorMessage(error: unknown): string {
   return `Failed to upload stream log artifact: ${String(error)}`;
 }
 
+export function streamLogArtifactName(runId: string): string {
+  return `bugbit-agent-stream-${runId}`;
+}
+
 export async function uploadStreamLogArtifact(
   runId: string,
   streamLogPath: string,
 ): Promise<{ id?: number }> {
+  const absolutePath = path.resolve(streamLogPath);
+  const rootDirectory = path.dirname(absolutePath);
   const artifactClient = new DefaultArtifactClient();
   return artifactClient.uploadArtifact(
-    `bugbit-agent-stream-${runId}`,
-    [path.basename(streamLogPath)],
-    path.dirname(streamLogPath),
+    streamLogArtifactName(runId),
+    [absolutePath],
+    rootDirectory,
   );
 }

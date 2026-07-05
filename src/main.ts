@@ -1,6 +1,10 @@
 import * as core from '@actions/core';
 import * as path from 'path';
-import { artifactUploadErrorMessage, uploadStreamLogArtifact } from './artifactUpload';
+import {
+  artifactUploadErrorMessage,
+  streamLogArtifactName,
+  uploadStreamLogArtifact,
+} from './artifactUpload';
 import { resolveActionPath } from './actionPath';
 import { assertRepoCheckedOut } from './checkCheckout';
 import { buildSkillPrompt, parseReviewModes } from './reviewModes';
@@ -85,8 +89,10 @@ async function run(): Promise<void> {
 
     if (saveStreamLog && streamLogPath) {
       try {
+        const artifactName = streamLogArtifactName(runId);
+        core.info(`Uploading stream log artifact "${artifactName}" from ${streamLogPath}…`);
         const uploadResponse = await uploadStreamLogArtifact(runId, streamLogPath);
-        core.info(`Uploaded stream log artifact (id: ${uploadResponse.id ?? 'unknown'})`);
+        core.info(`Uploaded stream log artifact "${artifactName}" (id: ${uploadResponse.id ?? 'unknown'})`);
       } catch (error) {
         core.setFailed(artifactUploadErrorMessage(error));
         return;
