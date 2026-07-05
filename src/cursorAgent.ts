@@ -13,10 +13,16 @@ export async function runAgent(
   core.setSecret(apiKey);
 
   try {
+    // permissions.json copied to cwd/.cursor/ is best-effort for Shell exploration; PR ops use customTools.
     await using agent = await Agent.create({
       apiKey,
       model: { id: model },
-      local: { cwd, customTools },
+      local: {
+        cwd,
+        customTools,
+        autoReview: true,
+        sandboxOptions: { enabled: true },
+      },
     });
 
     const run = await agent.send(prompt);

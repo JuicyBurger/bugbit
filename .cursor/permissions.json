@@ -1,0 +1,31 @@
+{
+  "mcpAllowlist": [
+    "custom-user-tools:*"
+  ],
+  "terminalAllowlist": [
+    "git log",
+    "git show",
+    "git diff",
+    "git blame",
+    "grep",
+    "rg",
+    "cat",
+    "head",
+    "tail",
+    "ls",
+    "find",
+    "wc"
+  ],
+  "autoRun": {
+    "allow_instructions": [
+      "Read-only inspection of source files and git history for code review context."
+    ],
+    "block_instructions": [
+      "Block any command that writes, modifies, deletes, or commits files.",
+      "Block git push, git commit, npm publish, curl, wget, and package installs.",
+      "Block reads of .env, .env.*, *.pem, *.key, id_rsa, and credential files.",
+      "Block rm, mv, cp, chmod, tee, sed -i, and patch operations.",
+      "Block node scripts/ invocations — PR operations use custom tools only."
+    ]
+  }
+}

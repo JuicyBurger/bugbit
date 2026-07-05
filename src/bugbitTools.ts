@@ -1,4 +1,5 @@
 import type { SDKCustomTool, SDKJsonValue } from '@cursor/sdk';
+import * as fs from 'fs';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
 
@@ -45,6 +46,13 @@ function loadOps(actionPath: string): Promise<OpsModule> {
 function isAuthError(error: unknown): boolean {
   const status = (error as { status?: number })?.status;
   return status === 401 || status === 403;
+}
+
+export function copyPermissionsToWorkspace(actionPath: string, cwd: string): void {
+  const src = path.join(actionPath, '.cursor', 'permissions.json');
+  const dst = path.join(cwd, '.cursor', 'permissions.json');
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  fs.copyFileSync(src, dst);
 }
 
 export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCustomTool> {
