@@ -85,6 +85,7 @@ out
 .nuxt
 dist/*
 !dist/index.js
+!dist/scripts/
 .output
 
 # Gatsby files

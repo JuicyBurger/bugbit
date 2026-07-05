@@ -8,6 +8,7 @@ const config: Config = {
   moduleFileExtensions: ['ts', 'js', 'json', 'mjs'],
   moduleNameMapper: {
     '^@actions/core$': '<rootDir>/__tests__/__mocks__/actionsCore.ts',
+    '^@actions/github$': '<rootDir>/__tests__/__mocks__/actionsGithub.ts',
   },
   transform: {
     '^.+\\.tsx?$': [

@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "bundle": "pnpm run build && ncc build lib/main.js -o dist",
+    "bundle:scripts": "ncc build scripts/lib/operations.mjs -o dist/scripts/operations",
+    "bundle": "pnpm run build && pnpm run bundle:scripts && ncc build lib/main.js -o dist",
     "test": "jest"
   },
   "keywords": [],

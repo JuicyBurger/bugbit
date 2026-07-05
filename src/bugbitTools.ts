@@ -1,9 +1,10 @@
 import type { SDKCustomTool, SDKJsonValue } from '@cursor/sdk';
 import * as core from '@actions/core';
+import { getOctokit } from '@actions/github';
 import * as fs from 'fs';
 import * as path from 'path';
-import { pathToFileURL } from 'url';
 import { dynamicImport } from './dynamicImport';
+import { resolveActionModuleUrl } from './resolveActionModule';
 
 export interface BugbitToolDeps {
   githubToken: string;
@@ -46,20 +47,16 @@ type PreflightModule = {
 
 function loadOps(actionPath: string): Promise<OpsModule> {
   if (!opsPromise) {
-    const opsUrl = pathToFileURL(
-      path.join(actionPath, 'scripts', 'lib', 'operations.mjs'),
-    ).href;
-    opsPromise = dynamicImport<OpsModule>(opsUrl);
+    opsPromise = dynamicImport<OpsModule>(resolveActionModuleUrl(actionPath, 'operations'));
   }
   return opsPromise;
 }
 
 function loadPreflight(actionPath: string): Promise<PreflightModule> {
   if (!preflightPromise) {
-    const preflightUrl = pathToFileURL(
-      path.join(actionPath, 'scripts', 'lib', 'preflight.mjs'),
-    ).href;
-    preflightPromise = dynamicImport<PreflightModule>(preflightUrl);
+    preflightPromise = dynamicImport<PreflightModule>(
+      resolveActionModuleUrl(actionPath, 'preflight'),
+    );
   }
   return preflightPromise;
 }
@@ -71,11 +68,14 @@ export async function checkReviewPermissions(deps: BugbitToolDeps): Promise<void
 
   core.info('Checking GitHub token permissions for PR review…');
   try {
-    await assertReviewPermissions({
-      token: deps.githubToken,
-      eventPath: deps.eventPath,
-      repository: deps.repository,
-    });
+    await assertReviewPermissions(
+      {
+        token: deps.githubToken,
+        eventPath: deps.eventPath,
+        repository: deps.repository,
+      },
+      getOctokit(deps.githubToken),
+    );
   } catch (error) {
     throw new Error(formatPermissionErrorMessage(error));
   }
