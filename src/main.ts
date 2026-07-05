@@ -2,7 +2,7 @@ import * as core from '@actions/core';
 import * as path from 'path';
 import { assertRepoCheckedOut } from './checkCheckout';
 import { buildSkillPrompt, parseReviewModes } from './reviewModes';
-import { copyPermissionsToWorkspace, createBugbitTools } from './bugbitTools';
+import { copyPermissionsToWorkspace, createBugbitTools, isForkPullRequest } from './bugbitTools';
 import { runAgent } from './cursorAgent';
 
 async function run(): Promise<void> {
@@ -19,6 +19,15 @@ async function run(): Promise<void> {
 
     const eventPath = process.env.GITHUB_EVENT_PATH ?? '';
     const repository = process.env.GITHUB_REPOSITORY ?? '';
+
+    if (isForkPullRequest(eventPath)) {
+      core.setFailed(
+        'bugbit cannot post review comments on pull requests from forks: ' +
+          'GITHUB_TOKEN is read-only for fork PRs. ' +
+          'See bugbit documentation (DOCS-04) for workarounds.',
+      );
+      return;
+    }
 
     const actionPath = process.env.GITHUB_ACTION_PATH ?? cwd;
     // permissions.json is best-effort shell policy; custom tools are the trust boundary for PR ops.

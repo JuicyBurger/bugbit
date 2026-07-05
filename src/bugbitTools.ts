@@ -55,6 +55,14 @@ export function copyPermissionsToWorkspace(actionPath: string, cwd: string): voi
   fs.copyFileSync(src, dst);
 }
 
+export function isForkPullRequest(eventPath: string): boolean {
+  if (!eventPath) return false;
+  const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+  const pr = event.pull_request;
+  if (!pr) return false;
+  return pr.head?.repo?.full_name !== pr.base?.repo?.full_name;
+}
+
 export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCustomTool> {
   const toolDeps = {
     token: deps.githubToken,
