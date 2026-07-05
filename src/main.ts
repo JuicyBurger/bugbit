@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import * as path from 'path';
+import { resolveActionPath } from './actionPath';
 import { assertRepoCheckedOut } from './checkCheckout';
 import { buildSkillPrompt, parseReviewModes } from './reviewModes';
 import { copyPermissionsToWorkspace, createBugbitTools, isForkPullRequest } from './bugbitTools';
@@ -29,7 +30,7 @@ async function run(): Promise<void> {
       return;
     }
 
-    const actionPath = process.env.GITHUB_ACTION_PATH ?? cwd;
+    const actionPath = resolveActionPath(cwd);
     // permissions.json is best-effort shell policy; custom tools are the trust boundary for PR ops.
     copyPermissionsToWorkspace(actionPath, cwd);
     const promptsDir = path.join(actionPath, 'prompts');

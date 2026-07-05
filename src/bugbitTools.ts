@@ -1,4 +1,5 @@
 import type { SDKCustomTool, SDKJsonValue } from '@cursor/sdk';
+import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
@@ -49,8 +50,18 @@ function isAuthError(error: unknown): boolean {
 }
 
 export function copyPermissionsToWorkspace(actionPath: string, cwd: string): void {
-  const src = path.join(actionPath, '.cursor', 'permissions.json');
-  const dst = path.join(cwd, '.cursor', 'permissions.json');
+  const src = path.resolve(actionPath, '.cursor', 'permissions.json');
+  const dst = path.resolve(cwd, '.cursor', 'permissions.json');
+
+  if (!fs.existsSync(src)) {
+    core.warning(`permissions.json not found at ${src}; shell restrictions may not apply`);
+    return;
+  }
+
+  if (src === dst) {
+    return;
+  }
+
   fs.mkdirSync(path.dirname(dst), { recursive: true });
   fs.copyFileSync(src, dst);
 }

@@ -169,4 +169,11 @@ describe('copyPermissionsToWorkspace', () => {
     expect(fs.existsSync(dst)).toBe(true);
     expect(fs.readFileSync(dst, 'utf8')).toContain('custom-user-tools');
   });
+
+  it('no-ops when action path equals workspace', () => {
+    copyPermissionsToWorkspace(actionPath, actionPath);
+
+    const dst = path.join(actionPath, '.cursor', 'permissions.json');
+    expect(fs.readFileSync(dst, 'utf8')).toContain('custom-user-tools');
+  });
 });
