@@ -5,7 +5,7 @@ import {
   buildSkillPrompt,
   parseReviewModes,
   validateReviewModes,
-} from '../src/reviewModes';
+} from '../src/prompts/reviewModes';
 
 function makePromptsDir(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugbit-prompts-'));
@@ -32,6 +32,12 @@ describe('parseReviewModes', () => {
 describe('validateReviewModes', () => {
   it('throws on unknown mode', () => {
     expect(() => validateReviewModes(['bogus'])).toThrow('Unknown review mode: bogus');
+  });
+
+  it('throws when no modes are provided', () => {
+    expect(() => validateReviewModes([])).toThrow(
+      'review-modes must include at least one mode',
+    );
   });
 });
 

@@ -8,7 +8,7 @@ import {
   findVendoredRipgrep,
   getPlatformKey,
   getRgBinaryName,
-} from '../src/sdkBootstrap';
+} from '../src/runtime/sdkBootstrap';
 
 jest.mock('node:child_process', () => ({
   execFileSync: jest.fn(),

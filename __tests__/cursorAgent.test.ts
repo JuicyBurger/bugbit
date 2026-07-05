@@ -1,7 +1,7 @@
 import { Agent } from '@cursor/sdk';
 import * as core from '@actions/core';
 import type { SDKCustomTool } from '@cursor/sdk';
-import { runAgent } from '../src/cursorAgent';
+import { runAgent } from '../src/agent/cursorAgent';
 
 jest.mock('@cursor/sdk', () => ({
   Agent: {

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { assertRepoCheckedOut, CHECKOUT_ERROR } from '../src/checkCheckout';
+import { assertRepoCheckedOut, CHECKOUT_ERROR } from '../src/runtime/checkCheckout';
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'bugbit-checkout-'));

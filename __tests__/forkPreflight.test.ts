@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { isForkPullRequest } from '../src/bugbitTools';
+import { isForkPullRequest } from '../src/github/tools';
 
 function writeEvent(
   dir: string,

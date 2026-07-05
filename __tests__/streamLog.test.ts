@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as core from '@actions/core';
-import { StreamLogger } from '../src/streamLog';
+import { StreamLogger } from '../src/agent/streamLog';
 
 describe('StreamLogger', () => {
   let tempDir: string;

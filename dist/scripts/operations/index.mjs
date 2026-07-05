@@ -29160,9 +29160,18 @@ const external_node_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import
 ;// CONCATENATED MODULE: ./scripts/lib/event.mjs
 
 
+let cachedEventPath;
+/** @type {unknown} */
+let cachedEvent;
+
 function loadEvent(eventPath = process.env.GITHUB_EVENT_PATH) {
   if (!eventPath) throw new Error('GITHUB_EVENT_PATH not set');
-  return JSON.parse((0,external_node_fs_namespaceObject.readFileSync)(eventPath, 'utf8'));
+  if (cachedEventPath === eventPath && cachedEvent !== undefined) {
+    return cachedEvent;
+  }
+  cachedEvent = JSON.parse((0,external_node_fs_namespaceObject.readFileSync)(eventPath, 'utf8'));
+  cachedEventPath = eventPath;
+  return cachedEvent;
 }
 
 function requirePullRequest(eventPath = process.env.GITHUB_EVENT_PATH) {
@@ -29174,10 +29183,6 @@ function requirePullRequest(eventPath = process.env.GITHUB_EVENT_PATH) {
   return pr;
 }
 
-function getPullRequestFromEvent() {
-  const event = loadEvent();
-  return event.pull_request ?? null;
-}
 
 ;// CONCATENATED MODULE: external "fs"
 const external_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("fs");
@@ -33594,6 +33599,33 @@ function mapGitHubStatus(status) {
 }
 
 /**
+ * @param {Array<{ filename: string, status: string, previous_filename?: string, patch?: string }>} fileList
+ */
+function mapPullRequestFiles(fileList) {
+  return fileList.map((file) => {
+    const status = mapGitHubStatus(file.status);
+
+    if (status === 'deleted') {
+      return { path: file.filename, status: 'deleted' };
+    }
+
+    const entry = { path: file.filename, status };
+
+    if (status === 'renamed' && file.previous_filename) {
+      entry.previous_filename = file.previous_filename;
+    }
+
+    if (!file.patch) {
+      entry.hunks = [];
+    } else {
+      entry.hunks = parseUnifiedPatch(file.patch);
+    }
+
+    return entry;
+  });
+}
+
+/**
  * @param {Array<{ path: string, status: string, hunks?: Array<{ lines: Array<{ type: string, newLine?: number }> }> }>} files
  * @returns {Map<string, Set<number>>}
  */
@@ -33661,27 +33693,7 @@ async function fetchDiffLineMap(octokit, owner, repo, pullNumber) {
     pull_number: pullNumber,
   });
 
-  const files = fileList.map((file) => {
-    const status = mapGitHubStatus(file.status);
-
-    if (status === 'deleted') {
-      return { path: file.filename, status: 'deleted' };
-    }
-
-    const entry = { path: file.filename, status };
-
-    if (status === 'renamed' && file.previous_filename) {
-      entry.previous_filename = file.previous_filename;
-    }
-
-    if (!file.patch) {
-      entry.hunks = [];
-    } else {
-      entry.hunks = parseUnifiedPatch(file.patch);
-    }
-
-    return entry;
-  });
+  const files = mapPullRequestFiles(fileList);
 
   return buildLineMap(files);
 }
@@ -33724,27 +33736,7 @@ async function getDiff(deps) {
     pull_number: pr.number,
   });
 
-  const files = fileList.map((file) => {
-    const status = mapGitHubStatus(file.status);
-
-    if (status === 'deleted') {
-      return { path: file.filename, status: 'deleted' };
-    }
-
-    const entry = { path: file.filename, status };
-
-    if (status === 'renamed' && file.previous_filename) {
-      entry.previous_filename = file.previous_filename;
-    }
-
-    if (!file.patch) {
-      entry.hunks = [];
-    } else {
-      entry.hunks = parseUnifiedPatch(file.patch);
-    }
-
-    return entry;
-  });
+  const files = mapPullRequestFiles(fileList);
 
   const output = { files };
 

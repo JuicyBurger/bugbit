@@ -1,6 +1,6 @@
 import type { Run } from '@cursor/sdk';
 import * as core from '@actions/core';
-import { waitForRunWithHeartbeat } from '../src/runWait';
+import { waitForRunWithHeartbeat } from '../src/agent/runWait';
 
 describe('waitForRunWithHeartbeat', () => {
   beforeEach(() => {

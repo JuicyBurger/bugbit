@@ -10,6 +10,14 @@ type Hunk = {
 let parseUnifiedPatch: (patch: string) => Hunk[];
 let buildLineMap: (files: Array<{ path: string; status: string; hunks?: Hunk[] }>) => Map<string, Set<number>>;
 let mapGitHubStatus: (status: string) => string;
+let mapPullRequestFiles: (
+  fileList: Array<{
+    filename: string;
+    status: string;
+    previous_filename?: string;
+    patch?: string;
+  }>,
+) => Array<{ path: string; status: string; previous_filename?: string; hunks?: Hunk[] }>;
 
 beforeAll(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -17,6 +25,7 @@ beforeAll(() => {
   parseUnifiedPatch = mod.parseUnifiedPatch;
   buildLineMap = mod.buildLineMap;
   mapGitHubStatus = mod.mapGitHubStatus;
+  mapPullRequestFiles = mod.mapPullRequestFiles;
 });
 
 describe('parseUnifiedPatch', () => {
@@ -86,5 +95,43 @@ describe('mapGitHubStatus', () => {
     expect(mapGitHubStatus('added')).toBe('added');
     expect(mapGitHubStatus('modified')).toBe('modified');
     expect(mapGitHubStatus('renamed')).toBe('renamed');
+  });
+});
+
+describe('mapPullRequestFiles', () => {
+  it('maps deleted files without hunks', () => {
+    const files = mapPullRequestFiles([
+      { filename: 'src/removed.ts', status: 'removed' },
+    ]);
+
+    expect(files).toEqual([{ path: 'src/removed.ts', status: 'deleted' }]);
+  });
+
+  it('includes previous_filename for renamed files', () => {
+    const files = mapPullRequestFiles([
+      {
+        filename: 'src/new-name.ts',
+        status: 'renamed',
+        previous_filename: 'src/old-name.ts',
+        patch: '@@ -1 +1 @@\n-old\n+new',
+      },
+    ]);
+
+    expect(files[0]).toMatchObject({
+      path: 'src/new-name.ts',
+      status: 'renamed',
+      previous_filename: 'src/old-name.ts',
+    });
+    expect(files[0].hunks).toHaveLength(1);
+  });
+
+  it('uses empty hunks when patch is missing', () => {
+    const files = mapPullRequestFiles([
+      { filename: 'src/large.ts', status: 'modified' },
+    ]);
+
+    expect(files).toEqual([
+      { path: 'src/large.ts', status: 'modified', hunks: [] },
+    ]);
   });
 });

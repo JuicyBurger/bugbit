@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
-import { resolveActionModuleUrl } from '../src/resolveActionModule';
+import { resolveActionModuleUrl } from '../src/runtime/resolveActionModule';
 
 describe('resolveActionModuleUrl', () => {
   let actionPath: string;

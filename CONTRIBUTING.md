@@ -23,7 +23,11 @@ pnpm bundle
 
 | Path | Purpose |
 |------|---------|
-| `src/` | TypeScript source for the GitHub Action |
+| `src/main.ts` | Action entrypoint (orchestration) |
+| `src/agent/` | Cursor agent runner, timeout, stream logging |
+| `src/github/` | Custom tools, PR prefetch, shared GitHub types |
+| `src/prompts/` | Review mode parsing and skill prompt assembly |
+| `src/runtime/` | Action path resolution, checkout checks, artifacts, SDK bootstrap |
 | `scripts/lib/` | ESM modules loaded at runtime (`operations`, `preflight`, etc.) |
 | `dist/` | **Shipped** bundle consumed by `uses: Vilancer/bugbit@…` |
 | `prompts/` | Agent system prompt overlay |

@@ -1,22 +1,22 @@
 import * as core from '@actions/core';
 import * as path from 'path';
+import { runAgent } from './agent/cursorAgent';
 import {
   artifactUploadErrorMessage,
   streamLogArtifactName,
   uploadStreamLogArtifact,
-} from './artifactUpload';
-import { resolveActionPath } from './actionPath';
-import { assertRepoCheckedOut } from './checkCheckout';
-import { buildSkillPrompt } from './reviewModes';
+} from './runtime/artifactUpload';
+import { resolveActionPath } from './runtime/actionPath';
+import { assertRepoCheckedOut } from './runtime/checkCheckout';
+import { buildSkillPrompt } from './prompts/reviewModes';
 import {
   checkReviewPermissions,
   copyPermissionsToWorkspace,
   createBugbitTools,
   isForkPullRequest,
   prefetchPrData,
-} from './bugbitTools';
-import { runAgent } from './cursorAgent';
-import { bootstrapRipgrep } from './sdkBootstrap';
+} from './github/tools';
+import { bootstrapRipgrep } from './runtime/sdkBootstrap';
 
 async function run(): Promise<void> {
   try {

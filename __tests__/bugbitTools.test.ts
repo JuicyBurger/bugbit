@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import type { SDKCustomTool } from '@cursor/sdk';
 
-jest.mock('../src/dynamicImport');
+jest.mock('../src/runtime/dynamicImport');
 
 const mockOpsSource = `
 export async function getPrContext() {
@@ -40,13 +40,13 @@ function setupActionPath(): string {
 
 describe('createBugbitTools', () => {
   let actionPath: string;
-  let createBugbitTools: typeof import('../src/bugbitTools').createBugbitTools;
-  let copyPermissionsToWorkspace: typeof import('../src/bugbitTools').copyPermissionsToWorkspace;
+  let createBugbitTools: typeof import('../src/github/tools').createBugbitTools;
+  let copyPermissionsToWorkspace: typeof import('../src/github/tools').copyPermissionsToWorkspace;
 
   beforeEach(async () => {
     jest.resetModules();
     actionPath = setupActionPath();
-    const mod = await import('../src/bugbitTools');
+    const mod = await import('../src/github/tools');
     createBugbitTools = mod.createBugbitTools;
     copyPermissionsToWorkspace = mod.copyPermissionsToWorkspace;
   });
@@ -152,7 +152,7 @@ describe('prefetchPrData', () => {
   });
 
   it('returns prefetched context and diff', async () => {
-    const { prefetchPrData } = await import('../src/bugbitTools');
+    const { prefetchPrData } = await import('../src/github/tools');
 
     const result = await prefetchPrData({
       githubToken: 'test-token',
@@ -175,7 +175,7 @@ describe('prefetchPrData', () => {
 describe('copyPermissionsToWorkspace', () => {
   let actionPath: string;
   let workspace: string;
-  let copyPermissionsToWorkspace: typeof import('../src/bugbitTools').copyPermissionsToWorkspace;
+  let copyPermissionsToWorkspace: typeof import('../src/github/tools').copyPermissionsToWorkspace;
 
   beforeEach(async () => {
     jest.resetModules();
@@ -188,7 +188,7 @@ describe('copyPermissionsToWorkspace', () => {
       '{"mcpAllowlist":["custom-user-tools:*"]}',
     );
 
-    const mod = await import('../src/bugbitTools');
+    const mod = await import('../src/github/tools');
     copyPermissionsToWorkspace = mod.copyPermissionsToWorkspace;
   });
 

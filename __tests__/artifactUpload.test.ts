@@ -5,7 +5,7 @@ import {
   artifactUploadErrorMessage,
   streamLogArtifactName,
   uploadStreamLogArtifact,
-} from '../src/artifactUpload';
+} from '../src/runtime/artifactUpload';
 
 const uploadArtifact = jest.fn().mockResolvedValue({ id: 42 });
 

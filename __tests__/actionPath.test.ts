@@ -19,7 +19,7 @@ describe('resolveActionPath', () => {
     fs.writeFileSync(path.join(actionRoot, 'prompts', 'system.md'), '# system');
 
     process.env.GITHUB_ACTION_PATH = actionRoot;
-    const { resolveActionPath } = await import('../src/actionPath');
+    const { resolveActionPath } = await import('../src/runtime/actionPath');
 
     expect(resolveActionPath('/tmp/workspace')).toBe(actionRoot);
 
@@ -30,7 +30,7 @@ describe('resolveActionPath', () => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'bugbit-ws-'));
     process.env.GITHUB_ACTION_PATH = workspace;
 
-    const { resolveActionPath } = await import('../src/actionPath');
+    const { resolveActionPath } = await import('../src/runtime/actionPath');
     const resolved = resolveActionPath(workspace);
 
     expect(resolved).not.toBe(workspace);
