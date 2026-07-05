@@ -27,6 +27,12 @@ inputs:
       can read PR context and post inline comments itself.
     required: true
     default: '${{ github.token }}'
+  save-stream-log:
+    description: >
+      When true, save raw agent stream events as a JSONL artifact
+      (bugbit-agent-stream-{runId}) for debugging.
+    required: false
+    default: 'false'
 
 runs:
   using: 'node24'

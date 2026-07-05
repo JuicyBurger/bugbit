@@ -55,4 +55,18 @@ describe('buildSkillPrompt', () => {
 
     expect(prompt.startsWith('/simplify\n\n')).toBe(true);
   });
+
+  it('appends prefetched PR data when provided', () => {
+    const promptsDir = makePromptsDir();
+    const actionPath = path.dirname(promptsDir);
+
+    const prompt = buildSkillPrompt('code-review', promptsDir, actionPath, {
+      context: { number: 1 },
+      diff: { files: [{ path: 'a.ts' }] },
+    });
+
+    expect(prompt).toContain('<prefetched_pr_data>');
+    expect(prompt).toContain('"number": 1');
+    expect(prompt).toContain('You MUST call post_review before finishing');
+  });
 });

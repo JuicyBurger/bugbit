@@ -1,13 +1,22 @@
 import * as core from '@actions/core';
+import { DefaultArtifactClient } from '@actions/artifact';
 import * as path from 'path';
 import { resolveActionPath } from './actionPath';
 import { assertRepoCheckedOut } from './checkCheckout';
 import { buildSkillPrompt, parseReviewModes } from './reviewModes';
-import { copyPermissionsToWorkspace, createBugbitTools, isForkPullRequest } from './bugbitTools';
+import {
+  copyPermissionsToWorkspace,
+  createBugbitTools,
+  isForkPullRequest,
+  prefetchPrData,
+} from './bugbitTools';
 import { runAgent } from './cursorAgent';
+import { bootstrapRipgrep } from './sdkBootstrap';
 
 async function run(): Promise<void> {
   try {
+    bootstrapRipgrep();
+
     const cwd = process.cwd();
     assertRepoCheckedOut(cwd);
 
@@ -17,6 +26,7 @@ async function run(): Promise<void> {
 
     const model = core.getInput('model') || 'composer-2.5';
     const modesInput = core.getInput('review-modes') || 'code-review';
+    const saveStreamLog = core.getBooleanInput('save-stream-log');
 
     const eventPath = process.env.GITHUB_EVENT_PATH ?? '';
     const repository = process.env.GITHUB_REPOSITORY ?? '';
@@ -35,18 +45,38 @@ async function run(): Promise<void> {
     copyPermissionsToWorkspace(actionPath, cwd);
     const promptsDir = path.join(actionPath, 'prompts');
 
-    const prompt = buildSkillPrompt(modesInput, promptsDir, actionPath);
-    const modes = parseReviewModes(modesInput);
-
-    const customTools = createBugbitTools({
+    const toolDeps = {
       githubToken,
       eventPath,
       repository,
       actionPath,
-    });
+    };
+
+    const prefetched = await prefetchPrData(toolDeps);
+    const prompt = buildSkillPrompt(modesInput, promptsDir, actionPath, prefetched);
+    const modes = parseReviewModes(modesInput);
+
+    const customTools = createBugbitTools(toolDeps);
 
     core.info(`Starting Cursor agent (model: ${model}, modes: ${modes.join(', ')})`);
-    await runAgent(apiKey, model, prompt, cwd, customTools);
+    const { runId, streamLogPath } = await runAgent(
+      apiKey,
+      model,
+      prompt,
+      cwd,
+      customTools,
+      { saveStreamLog },
+    );
+
+    if (saveStreamLog && streamLogPath) {
+      const artifactClient = new DefaultArtifactClient();
+      const uploadResponse = await artifactClient.uploadArtifact(
+        `bugbit-agent-stream-${runId}`,
+        [path.basename(streamLogPath)],
+        path.dirname(streamLogPath),
+      );
+      core.info(`Uploaded stream log artifact (id: ${uploadResponse.id ?? 'unknown'})`);
+    }
   } catch (error) {
     core.setFailed(error instanceof Error ? error.message : String(error));
   }

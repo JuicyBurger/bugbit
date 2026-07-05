@@ -25,7 +25,9 @@
       "Block git push, git commit, npm publish, curl, wget, and package installs.",
       "Block reads of .env, .env.*, *.pem, *.key, id_rsa, and credential files.",
       "Block rm, mv, cp, chmod, tee, sed -i, and patch operations.",
-      "Block node scripts/ invocations — PR operations use custom tools only."
+      "Block node scripts/ invocations — PR operations use custom tools only.",
+      "Block npm test, pnpm test, yarn test, make test, and cargo test.",
+      "Block npm run lint, pnpm lint, yarn lint, and other lint/format/build script invocations."
     ]
   }
 }

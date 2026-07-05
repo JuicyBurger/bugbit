@@ -137,6 +137,39 @@ describe('createBugbitTools', () => {
   });
 });
 
+describe('prefetchPrData', () => {
+  let actionPath: string;
+
+  beforeEach(async () => {
+    jest.resetModules();
+    actionPath = setupActionPath();
+  });
+
+  afterEach(() => {
+    fs.rmSync(actionPath, { recursive: true, force: true });
+  });
+
+  it('returns prefetched context and diff', async () => {
+    const { prefetchPrData } = await import('../src/bugbitTools');
+
+    const result = await prefetchPrData({
+      githubToken: 'test-token',
+      eventPath: '/tmp/event.json',
+      repository: 'owner/repo',
+      actionPath,
+    });
+
+    expect(result.context).toEqual({
+      number: 42,
+      headRef: 'feat',
+      baseRef: 'main',
+      headSha: 'abc',
+      baseSha: 'def',
+    });
+    expect(result.diff).toEqual({ files: [{ path: 'src/a.ts', status: 'modified' }] });
+  });
+});
+
 describe('copyPermissionsToWorkspace', () => {
   let actionPath: string;
   let workspace: string;

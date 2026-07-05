@@ -26,12 +26,17 @@ function makeCustomTools(): Record<string, SDKCustomTool> {
 
 function mockAgentSuccess(
   waitResult: { status: string; id: string } = { status: 'completed', id: 'run-1' },
+  streamEvents: Array<Record<string, unknown>> = [],
 ): void {
   mockCreate.mockResolvedValue({
     agentId: 'agent-1',
     send: jest.fn().mockResolvedValue({
       id: 'run-1',
-      stream: async function* () {},
+      stream: async function* () {
+        for (const event of streamEvents) {
+          yield event;
+        }
+      },
       wait: jest.fn().mockResolvedValue(waitResult),
     }),
     [Symbol.asyncDispose]: async () => {},
@@ -48,16 +53,18 @@ describe('runAgent', () => {
     const customTools = makeCustomTools();
     mockAgentSuccess();
 
-    await runAgent('api-key', 'composer-2.5', 'review prompt', '/tmp/repo', customTools);
+    const result = await runAgent('api-key', 'composer-2.5', 'review prompt', '/tmp/repo', customTools);
 
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         local: expect.objectContaining({
           customTools,
           cwd: '/tmp/repo',
+          autoReview: false,
         }),
       }),
     );
+    expect(result.runId).toBe('run-1');
   });
 
   it('masks apiKey with core.setSecret before logging', async () => {
@@ -72,6 +79,43 @@ describe('runAgent', () => {
     expect(setSecretOrder).toBeLessThan(infoOrder);
   });
 
+  it('formats stream events instead of logging raw JSON', async () => {
+    const customTools = makeCustomTools();
+    mockAgentSuccess({ status: 'completed', id: 'run-1' }, [
+      {
+        type: 'tool_call',
+        name: 'get_pr_context',
+        status: 'running',
+      },
+    ]);
+
+    await runAgent('api-key', 'composer-2.5', 'prompt', '/tmp/repo', customTools);
+
+    expect(core.info).toHaveBeenCalledWith('[tool] get_pr_context (running)');
+    expect(core.info).not.toHaveBeenCalledWith(expect.stringContaining('"type":"tool_call"'));
+  });
+
+  it('returns streamLogPath when saveStreamLog is enabled', async () => {
+    const customTools = makeCustomTools();
+    mockAgentSuccess();
+
+    const result = await runAgent('api-key', 'composer-2.5', 'prompt', '/tmp/repo', customTools, {
+      saveStreamLog: true,
+    });
+
+    expect(result.streamLogPath).toContain('bugbit-stream-run-1.jsonl');
+  });
+
+  it('logs when waiting for run completion after stream ends', async () => {
+    const customTools = makeCustomTools();
+    mockAgentSuccess();
+
+    await runAgent('api-key', 'composer-2.5', 'prompt', '/tmp/repo', customTools);
+
+    expect(core.info).toHaveBeenCalledWith('Stream ended; waiting for run completion…');
+    expect(core.info).toHaveBeenCalledWith('Run completed with status=completed');
+  });
+
   it('rejects when run.wait exceeds the agent timeout', async () => {
     const customTools = makeCustomTools();
 
@@ -81,6 +125,7 @@ describe('runAgent', () => {
         id: 'run-1',
         stream: async function* () {},
         wait: jest.fn().mockReturnValue(new Promise(() => {})),
+        cancel: jest.fn().mockResolvedValue(undefined),
       }),
       [Symbol.asyncDispose]: async () => {},
     } as never);

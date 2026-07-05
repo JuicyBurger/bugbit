@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import type { PrefetchedPrData } from './bugbitTools';
 
 export const ALLOWED_MODES = ['code-review', 'security-review', 'simplify'] as const;
 export type ReviewMode = (typeof ALLOWED_MODES)[number];
@@ -44,10 +45,28 @@ function loadSystemPrompt(promptsDir: string, actionPath?: string): string {
   return systemPrompt.replaceAll('{{GITHUB_ACTION_PATH}}', resolvedActionPath);
 }
 
+function buildPrefetchedSection(prefetched?: PrefetchedPrData): string {
+  if (!prefetched) {
+    return '';
+  }
+
+  const lines = [
+    '<prefetched_pr_data>',
+    'PR context and diff are preloaded below. Treat this as the authoritative review scope.',
+    'Do not spawn task subagents to discover changed files.',
+    'You MUST call post_review before finishing (use an empty findings array if no issues).',
+    JSON.stringify(prefetched, null, 2),
+    '</prefetched_pr_data>',
+  ];
+
+  return `\n\n${lines.join('\n')}`;
+}
+
 export function buildSkillPrompt(
   modesInput: string,
   promptsDir: string,
   actionPath?: string,
+  prefetched?: PrefetchedPrData,
 ): string {
   const modes = parseReviewModes(modesInput);
   validateReviewModes(modes);
@@ -57,5 +76,5 @@ export function buildSkillPrompt(
     .join('\n');
   const systemPrompt = loadSystemPrompt(promptsDir, actionPath);
 
-  return `${skillLines}\n\n${systemPrompt}`;
+  return `${skillLines}\n\n${systemPrompt}${buildPrefetchedSection(prefetched)}`;
 }

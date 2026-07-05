@@ -66,6 +66,43 @@ export function copyPermissionsToWorkspace(actionPath: string, cwd: string): voi
   fs.copyFileSync(src, dst);
 }
 
+export interface PrefetchedPrData {
+  context: unknown;
+  diff?: unknown;
+  diffError?: { code: string; message: string };
+}
+
+export async function prefetchPrData(deps: BugbitToolDeps): Promise<PrefetchedPrData> {
+  const ops = await loadOps(deps.actionPath);
+  const toolDeps = {
+    token: deps.githubToken,
+    eventPath: deps.eventPath,
+    repository: deps.repository,
+  };
+
+  core.info('Prefetching PR context and diff…');
+  const context = await ops.getPrContext(toolDeps);
+
+  try {
+    const diff = await ops.getDiff(toolDeps);
+    const fileCount = Array.isArray((diff as { files?: unknown[] })?.files)
+      ? (diff as { files: unknown[] }).files.length
+      : 0;
+    core.info(`Prefetched diff: ${fileCount} changed file(s)`);
+    return { context, diff };
+  } catch (error) {
+    const err = error as Error & { code?: string };
+    if (err.code === 'DIFF_TOO_LARGE') {
+      core.warning(`Diff too large to prefetch: ${err.message}; agent must call get_diff`);
+      return {
+        context,
+        diffError: { code: err.code, message: err.message },
+      };
+    }
+    throw error;
+  }
+}
+
 export function isForkPullRequest(eventPath: string): boolean {
   if (!eventPath) return false;
   const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
@@ -93,6 +130,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
         additionalProperties: false,
       },
       execute: async () => {
+        core.info('[bugbit] get_pr_context called');
         const ops = await getOps();
         return (await ops.getPrContext(toolDeps)) as SDKJsonValue;
       },
@@ -106,6 +144,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
         additionalProperties: false,
       },
       execute: async () => {
+        core.info('[bugbit] get_diff called');
         try {
           const ops = await getOps();
           return (await ops.getDiff(toolDeps)) as SDKJsonValue;
@@ -146,10 +185,13 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
         additionalProperties: false,
       },
       execute: async (args) => {
-        const ops = await getOps();
         const findings = args.findings as unknown[];
+        core.info(`[bugbit] post_review called with ${findings.length} finding(s)`);
+        const ops = await getOps();
         try {
-          return (await ops.postReview(toolDeps, findings)) as SDKJsonValue;
+          const result = (await ops.postReview(toolDeps, findings)) as SDKJsonValue;
+          core.info('[bugbit] post_review completed');
+          return result;
         } catch (error) {
           if (isAuthError(error)) {
             throw error;
@@ -172,6 +214,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
         additionalProperties: false,
       },
       execute: async (args) => {
+        core.info(`[bugbit] post_inline_comment called for ${args.path}:${args.line}`);
         const ops = await getOps();
         const result = await ops.postInlineComment(toolDeps, {
           path: args.path as string,
