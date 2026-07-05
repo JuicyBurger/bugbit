@@ -33,6 +33,15 @@ type OpsModule = {
 };
 
 let opsPromise: Promise<OpsModule> | null = null;
+let preflightPromise: Promise<PreflightModule> | null = null;
+
+type PreflightModule = {
+  assertReviewPermissions: (
+    deps: { token: string; eventPath: string; repository: string },
+    octokit?: unknown,
+  ) => Promise<void>;
+  formatPermissionErrorMessage: (error: unknown) => string;
+};
 
 function loadOps(actionPath: string): Promise<OpsModule> {
   if (!opsPromise) {
@@ -42,6 +51,34 @@ function loadOps(actionPath: string): Promise<OpsModule> {
     opsPromise = import(opsUrl) as Promise<OpsModule>;
   }
   return opsPromise;
+}
+
+function loadPreflight(actionPath: string): Promise<PreflightModule> {
+  if (!preflightPromise) {
+    const preflightUrl = pathToFileURL(
+      path.join(actionPath, 'scripts', 'lib', 'preflight.mjs'),
+    ).href;
+    preflightPromise = import(preflightUrl) as Promise<PreflightModule>;
+  }
+  return preflightPromise;
+}
+
+export async function checkReviewPermissions(deps: BugbitToolDeps): Promise<void> {
+  const { assertReviewPermissions, formatPermissionErrorMessage } = await loadPreflight(
+    deps.actionPath,
+  );
+
+  core.info('Checking GitHub token permissions for PR review…');
+  try {
+    await assertReviewPermissions({
+      token: deps.githubToken,
+      eventPath: deps.eventPath,
+      repository: deps.repository,
+    });
+  } catch (error) {
+    throw new Error(formatPermissionErrorMessage(error));
+  }
+  core.info('GitHub token permissions OK');
 }
 
 function isAuthError(error: unknown): boolean {

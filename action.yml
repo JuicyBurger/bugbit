@@ -23,14 +23,15 @@ inputs:
     default: 'code-review'
   github-token:
     description: >
-      Token forwarded to the agent's scripts (as GITHUB_TOKEN) so it
-      can read PR context and post inline comments itself.
+      Token used to read PR context and post review comments. The consumer
+      workflow must grant permissions: contents: read, pull-requests: write.
     required: true
     default: '${{ github.token }}'
   save-stream-log:
     description: >
       When true, save raw agent stream events as a JSONL artifact
-      (bugbit-agent-stream-{runId}) for debugging.
+      (bugbit-agent-stream-{runId}) for debugging. Requires actions: write
+      on the consumer workflow job.
     required: false
     default: 'false'
 

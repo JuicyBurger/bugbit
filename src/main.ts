@@ -1,10 +1,11 @@
 import * as core from '@actions/core';
-import { DefaultArtifactClient } from '@actions/artifact';
 import * as path from 'path';
+import { artifactUploadErrorMessage, uploadStreamLogArtifact } from './artifactUpload';
 import { resolveActionPath } from './actionPath';
 import { assertRepoCheckedOut } from './checkCheckout';
 import { buildSkillPrompt, parseReviewModes } from './reviewModes';
 import {
+  checkReviewPermissions,
   copyPermissionsToWorkspace,
   createBugbitTools,
   isForkPullRequest,
@@ -41,9 +42,6 @@ async function run(): Promise<void> {
     }
 
     const actionPath = resolveActionPath(cwd);
-    // permissions.json is best-effort shell policy; custom tools are the trust boundary for PR ops.
-    copyPermissionsToWorkspace(actionPath, cwd);
-    const promptsDir = path.join(actionPath, 'prompts');
 
     const toolDeps = {
       githubToken,
@@ -51,6 +49,23 @@ async function run(): Promise<void> {
       repository,
       actionPath,
     };
+
+    if (saveStreamLog) {
+      core.info(
+        'save-stream-log enabled — consumer workflow must include actions: write',
+      );
+    }
+
+    try {
+      await checkReviewPermissions(toolDeps);
+    } catch (error) {
+      core.setFailed(error instanceof Error ? error.message : String(error));
+      return;
+    }
+
+    // permissions.json is best-effort shell policy; custom tools are the trust boundary for PR ops.
+    copyPermissionsToWorkspace(actionPath, cwd);
+    const promptsDir = path.join(actionPath, 'prompts');
 
     const prefetched = await prefetchPrData(toolDeps);
     const prompt = buildSkillPrompt(modesInput, promptsDir, actionPath, prefetched);
@@ -69,13 +84,13 @@ async function run(): Promise<void> {
     );
 
     if (saveStreamLog && streamLogPath) {
-      const artifactClient = new DefaultArtifactClient();
-      const uploadResponse = await artifactClient.uploadArtifact(
-        `bugbit-agent-stream-${runId}`,
-        [path.basename(streamLogPath)],
-        path.dirname(streamLogPath),
-      );
-      core.info(`Uploaded stream log artifact (id: ${uploadResponse.id ?? 'unknown'})`);
+      try {
+        const uploadResponse = await uploadStreamLogArtifact(runId, streamLogPath);
+        core.info(`Uploaded stream log artifact (id: ${uploadResponse.id ?? 'unknown'})`);
+      } catch (error) {
+        core.setFailed(artifactUploadErrorMessage(error));
+        return;
+      }
     }
   } catch (error) {
     core.setFailed(error instanceof Error ? error.message : String(error));
