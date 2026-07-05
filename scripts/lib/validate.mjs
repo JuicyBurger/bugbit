@@ -1,0 +1,66 @@
+import { parseUnifiedPatch, mapGitHubStatus, buildLineMap } from './parse-patch.mjs';
+
+/**
+ * @param {string} path
+ * @param {number} line
+ * @param {Map<string, Set<number>>} lineMap
+ * @returns {{ valid: true } | { valid: false, code: string, message: string }}
+ */
+export function validateFinding(path, line, lineMap) {
+  if (!lineMap.has(path)) {
+    return {
+      valid: false,
+      code: 'PATH_NOT_IN_DIFF',
+      message: `Path not in PR diff: ${path}`,
+    };
+  }
+
+  if (!lineMap.get(path).has(line)) {
+    return {
+      valid: false,
+      code: 'LINE_NOT_IN_DIFF',
+      message: `Line ${line} not in diff hunk for ${path}`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * @param {import('@octokit/rest').Octokit} octokit
+ * @param {string} owner
+ * @param {string} repo
+ * @param {number} pullNumber
+ * @returns {Promise<Map<string, Set<number>>>}
+ */
+export async function fetchDiffLineMap(octokit, owner, repo, pullNumber) {
+  const { data: fileList } = await octokit.rest.pulls.listFiles({
+    owner,
+    repo,
+    pull_number: pullNumber,
+  });
+
+  const files = fileList.map((file) => {
+    const status = mapGitHubStatus(file.status);
+
+    if (status === 'deleted') {
+      return { path: file.filename, status: 'deleted' };
+    }
+
+    const entry = { path: file.filename, status };
+
+    if (status === 'renamed' && file.previous_filename) {
+      entry.previous_filename = file.previous_filename;
+    }
+
+    if (!file.patch) {
+      entry.hunks = [];
+    } else {
+      entry.hunks = parseUnifiedPatch(file.patch);
+    }
+
+    return entry;
+  });
+
+  return buildLineMap(files);
+}
