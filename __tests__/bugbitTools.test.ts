@@ -3,6 +3,8 @@ import * as os from 'os';
 import * as path from 'path';
 import type { SDKCustomTool } from '@cursor/sdk';
 
+jest.mock('../src/dynamicImport');
+
 const mockOpsSource = `
 export async function getPrContext() {
   return { number: 42, headRef: 'feat', baseRef: 'main', headSha: 'abc', baseSha: 'def' };

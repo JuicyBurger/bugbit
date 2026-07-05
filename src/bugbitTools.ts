@@ -3,6 +3,7 @@ import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
+import { dynamicImport } from './dynamicImport';
 
 export interface BugbitToolDeps {
   githubToken: string;
@@ -48,7 +49,7 @@ function loadOps(actionPath: string): Promise<OpsModule> {
     const opsUrl = pathToFileURL(
       path.join(actionPath, 'scripts', 'lib', 'operations.mjs'),
     ).href;
-    opsPromise = import(opsUrl) as Promise<OpsModule>;
+    opsPromise = dynamicImport<OpsModule>(opsUrl);
   }
   return opsPromise;
 }
@@ -58,7 +59,7 @@ function loadPreflight(actionPath: string): Promise<PreflightModule> {
     const preflightUrl = pathToFileURL(
       path.join(actionPath, 'scripts', 'lib', 'preflight.mjs'),
     ).href;
-    preflightPromise = import(preflightUrl) as Promise<PreflightModule>;
+    preflightPromise = dynamicImport<PreflightModule>(preflightUrl);
   }
   return preflightPromise;
 }
