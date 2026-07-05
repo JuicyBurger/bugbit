@@ -1,18 +1,233 @@
-# 🐛 bugbit
+# bugbit
 
 **Your own Cursor agent, reviewing every pull request.**
 
-bugbit is a lightweight, self-hosted GitHub Action that reviews pull requests
-using your own Cursor account and agent runtime. No opaque hosted reviewer in
-the middle — bugbit calls the Cursor SDK directly from inside the workflow,
-so every review runs with the same models, context handling, and codebase
-understanding you already get inside the Cursor editor. It just happens
-automatically, on every PR.
+bugbit is a lightweight, self-hosted GitHub Action that reviews pull requests using your own Cursor account and agent runtime. No opaque hosted reviewer in the middle — bugbit calls the Cursor SDK directly from inside the workflow, so every review runs with the same models, context handling, and codebase understanding you already get inside the Cursor editor.
 
-**How it works:**
+## How it works
 
-1. 🔍 Checks out the PR and resolves the head/base branches from the Actions context
-2. 🧠 Invokes Cursor built-in review skills (`/review`, `/review-security`, `/simplify`) with a GitHub Actions overlay for read-only, line-anchored findings
-3. 💬 Posts findings back as **inline comments**, on the exact diff lines — via the standard Pull Request Review Comments API
+1. Validates `GITHUB_TOKEN` permissions and prefetches PR context and diff
+2. Invokes Cursor built-in review skills (`/review`, `/review-security`, `/simplify`) with a GitHub Actions overlay for read-only, line-anchored findings
+3. Posts findings as **inline PR review comments** on the exact diff lines via custom tools (`post_review`)
 
-No walls of text at the bottom of the conversation. Just clean, line-anchored feedback, powered by the agent you already trust.
+No walls of text at the bottom of the conversation — just line-anchored feedback from the agent you already trust.
+
+> **Pre-release:** Examples below use `Vilancer/bugbit@main`. Pin to a release tag or commit SHA once tagged for production workflows.
+
+# Usage
+
+Minimal workflow — review on every pull request:
+
+```yaml
+name: PR Review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: Vilancer/bugbit@main
+        with:
+          cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
+```
+
+`github-token` defaults to `${{ github.token }}`. The job still needs `pull-requests: write` (see [Recommended permissions](#recommended-permissions)).
+
+# Inputs
+
+```yaml
+- uses: Vilancer/bugbit@main
+  with:
+    # Cursor API key (required). Store as a repository secret.
+    cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
+
+    # Token for reading PR context and posting review comments.
+    # Default: ${{ github.token }}
+    # Requires job permissions: contents: read, pull-requests: write
+    github-token: ${{ github.token }}
+
+    # Cursor model id.
+    # Default: composer-2.5
+    model: composer-2.5
+
+    # Comma-separated review modes: code-review, security-review, simplify
+    # Default: code-review
+    review-modes: code-review
+
+    # When true, upload a JSONL stream log artifact after the agent finishes.
+    # Requires actions: write on the job. Default: false
+    save-stream-log: false
+```
+
+| Input | Required | Default | Notes |
+|-------|----------|---------|-------|
+| `cursor-api-key` | yes | — | Repository secret with your Cursor API key |
+| `github-token` | yes | `${{ github.token }}` | Needs job `permissions` below |
+| `model` | no | `composer-2.5` | Cursor model id |
+| `review-modes` | no | `code-review` | Comma-separated: `code-review`, `security-review`, `simplify` |
+| `save-stream-log` | no | `false` | JSONL debug artifact; needs `actions: write` |
+
+# Scenarios
+
+## PR review with explicit token and multiple modes
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
+steps:
+  - uses: actions/checkout@v6
+
+  - uses: Vilancer/bugbit@main
+    with:
+      cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
+      github-token: ${{ github.token }}
+      review-modes: code-review, security-review, simplify
+```
+
+## Full workflow: PR open + manual dispatch (checkout head SHA)
+
+This pattern checks out the PR **head commit** (not the merge commit), supports manual re-runs via `workflow_dispatch`, and optionally uploads a stream log artifact for debugging.
+
+```yaml
+name: PR Review (bugbit)
+
+on:
+  pull_request:
+    types: [opened]
+    branches:
+      - dev
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to review
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write   # only needed when save-stream-log: true
+
+jobs:
+  bugbit_review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Resolve PR head SHA
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+            HEAD_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ inputs.pr_number }}" --jq .head.sha)"
+            echo "head_sha=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+
+      # bugbit expects a pull_request event payload; synthesize one for manual runs.
+      - name: Synthesize pull_request event (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" \
+            | jq '{ pull_request: . }' > "${GITHUB_EVENT_PATH}"
+
+      - uses: Vilancer/bugbit@main
+        with:
+          cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
+          github-token: ${{ github.token }}
+          model: composer-2.5
+          review-modes: code-review, security-review, simplify
+          save-stream-log: true
+```
+
+Store `CURSOR_API_KEY` as a repository secret (`Settings → Secrets and variables → Actions`).
+
+## Review modes
+
+Each `review-modes` value maps to a Cursor built-in skill:
+
+| Mode | Cursor skill | Purpose |
+|------|--------------|---------|
+| `code-review` | `/review` | General code review |
+| `security-review` | `/review-security` | Security-focused review |
+| `simplify` | `/simplify` | Complexity and simplification suggestions |
+
+Pass multiple modes as a comma-separated list: `code-review, security-review, simplify`.
+
+# Recommended permissions
+
+bugbit preflights the token before starting the agent (read PR metadata + create/delete a pending review probe). Grant only what you need.
+
+**Minimum (post review comments only):**
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+```
+
+**With stream log artifacts (`save-stream-log: true`):**
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
+```
+
+If `save-stream-log` is `false`, omit `actions: write` to keep the token scope minimal.
+
+# Limitations
+
+### Fork pull requests
+
+bugbit cannot post review comments on pull requests from forks. `GITHUB_TOKEN` is read-only for fork PR heads, so the action fails fast with a clear error. Use same-repository branches or a dedicated token/workflow pattern if you need fork coverage.
+
+### Ripgrep (`rg`)
+
+The Cursor SDK uses ripgrep for ignore-aware file search (`.gitignore`, `.cursorignore`). GitHub-hosted `ubuntu-latest` runners do not ship `rg` by default.
+
+bugbit works around this by vendoring the `@cursor/sdk-linux-x64` binary at `dist/vendor/linux-x64/rg` and setting `CURSOR_RIPGREP_PATH` at startup.
+
+- **Bundled platform:** linux-x64 only
+- **Tested on:** `ubuntu-latest` (linux) only
+- **macOS / Windows runners:** install `rg` on the runner or set `CURSOR_RIPGREP_PATH` to an absolute path
+- If `rg` is unavailable, reviews still run but ignore-mapping may be degraded (noisy logs, weaker exclude behavior)
+
+### Runner runtime
+
+The action uses the `node24` runtime (`action.yml`). Use `runs-on: ubuntu-latest` for the supported vendored `rg` path.
+
+### Action pinning
+
+`@main` tracks the latest commit and can change without notice. Pin to a release tag or full commit SHA in production workflows once releases are available.
+
+# Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local development, testing, and bundle instructions.
+
+# License
+
+[MIT](LICENSE)
