@@ -21,7 +21,6 @@ export async function runAgent(
         cwd,
         customTools,
         autoReview: true,
-        sandboxOptions: { enabled: true },
       },
     });
 
