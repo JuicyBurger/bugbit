@@ -27,24 +27,51 @@ describe('artifactUploadErrorMessage', () => {
   });
 });
 
+describe('streamLogArtifactName', () => {
+  it('includes the Cursor run id, GitHub run id, and UTC timestamp', () => {
+    expect(
+      streamLogArtifactName({
+        agentRunId: 'run-abc',
+        githubRunId: '28755654312',
+        timestamp: new Date('2026-07-05T23:30:45.000Z'),
+      }),
+    ).toBe('bugbit-agent-stream-run-abc-gh28755654312-20260705-233045Z');
+  });
+
+  it('falls back to local when GITHUB_RUN_ID is unset', () => {
+    const original = process.env.GITHUB_RUN_ID;
+    delete process.env.GITHUB_RUN_ID;
+
+    expect(
+      streamLogArtifactName({
+        agentRunId: 'run-abc',
+        timestamp: new Date('2026-07-05T23:30:45.000Z'),
+      }),
+    ).toBe('bugbit-agent-stream-run-abc-ghlocal-20260705-233045Z');
+
+    if (original === undefined) {
+      delete process.env.GITHUB_RUN_ID;
+    } else {
+      process.env.GITHUB_RUN_ID = original;
+    }
+  });
+});
+
 describe('uploadStreamLogArtifact', () => {
   beforeEach(() => {
     uploadArtifact.mockClear();
   });
 
-  it('names artifacts from the Cursor run id', () => {
-    expect(streamLogArtifactName('run-abc')).toBe('bugbit-agent-stream-run-abc');
-  });
-
   it('uploads using an absolute file path outside the workspace', async () => {
     const streamLogPath = path.join(os.tmpdir(), 'bugbit-stream-run-abc.jsonl');
+    const artifactName = 'bugbit-agent-stream-run-abc-gh28755654312-20260705-233045Z';
     fs.writeFileSync(streamLogPath, '{"type":"test"}\n');
 
     try {
-      await uploadStreamLogArtifact('run-abc', streamLogPath);
+      await uploadStreamLogArtifact(artifactName, streamLogPath);
 
       expect(uploadArtifact).toHaveBeenCalledWith(
-        'bugbit-agent-stream-run-abc',
+        artifactName,
         [path.resolve(streamLogPath)],
         path.dirname(path.resolve(streamLogPath)),
       );

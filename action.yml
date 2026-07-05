@@ -29,9 +29,11 @@ inputs:
     default: '${{ github.token }}'
   save-stream-log:
     description: >
-      When true, save raw agent stream events as a JSONL artifact
-      (bugbit-agent-stream-{runId}) for debugging. Requires actions: write
-      on the consumer workflow job.
+      When true, save raw agent stream events as a JSONL artifact for debugging.
+      Applies to every workflow trigger (pull_request, workflow_dispatch, etc.)
+      when enabled in the consumer job. Artifact name format:
+      bugbit-agent-stream-{agentRunId}-gh{githubRunId}-{YYYYMMDD-HHMMSSZ}.
+      Requires actions: write on the consumer workflow job.
     required: false
     default: 'false'
 

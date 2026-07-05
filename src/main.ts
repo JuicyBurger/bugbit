@@ -89,9 +89,12 @@ async function run(): Promise<void> {
 
     if (saveStreamLog && streamLogPath) {
       try {
-        const artifactName = streamLogArtifactName(runId);
+        const artifactName = streamLogArtifactName({
+          agentRunId: runId,
+          githubRunId: process.env.GITHUB_RUN_ID,
+        });
         core.info(`Uploading stream log artifact "${artifactName}" from ${streamLogPath}…`);
-        const uploadResponse = await uploadStreamLogArtifact(runId, streamLogPath);
+        const uploadResponse = await uploadStreamLogArtifact(artifactName, streamLogPath);
         core.info(`Uploaded stream log artifact "${artifactName}" (id: ${uploadResponse.id ?? 'unknown'})`);
       } catch (error) {
         core.setFailed(artifactUploadErrorMessage(error));
