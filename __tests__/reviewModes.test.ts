@@ -14,7 +14,7 @@ function makePromptsDir(): string {
 
   fs.writeFileSync(
     path.join(promptsDir, 'system.md'),
-    'System at {{GITHUB_ACTION_PATH}}/scripts/pr-context.mjs',
+    'System uses get_pr_context tool at {{GITHUB_ACTION_PATH}}',
   );
 
   return promptsDir;
@@ -44,8 +44,7 @@ describe('buildSkillPrompt', () => {
 
     expect(prompt.startsWith('/review\n/review-security\n\n')).toBe(true);
     expect(prompt).toContain(actionPath);
-    expect(prompt).toContain('System at');
-    expect(prompt).toContain('/scripts/pr-context.mjs');
+    expect(prompt).toContain('get_pr_context tool');
   });
 
   it('injects /simplify for simplify mode', () => {

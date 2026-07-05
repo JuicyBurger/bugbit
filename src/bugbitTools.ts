@@ -1,4 +1,4 @@
-import type { SDKCustomTool } from '@cursor/sdk';
+import type { SDKCustomTool, SDKJsonValue } from '@cursor/sdk';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
 
@@ -67,7 +67,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
       },
       execute: async () => {
         const ops = await getOps();
-        return (await ops.getPrContext(toolDeps)) as Record<string, unknown>;
+        return (await ops.getPrContext(toolDeps)) as SDKJsonValue;
       },
     },
     get_diff: {
@@ -81,11 +81,11 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
       execute: async () => {
         try {
           const ops = await getOps();
-          return (await ops.getDiff(toolDeps)) as Record<string, unknown>;
+          return (await ops.getDiff(toolDeps)) as SDKJsonValue;
         } catch (error) {
           const err = error as Error & { code?: string };
           if (err.code === 'DIFF_TOO_LARGE') {
-            return { error: { code: err.code, message: err.message } };
+            return { error: { code: err.code, message: err.message } } as SDKJsonValue;
           }
           if (isAuthError(error)) {
             throw error;
@@ -122,7 +122,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
         const ops = await getOps();
         const findings = args.findings as unknown[];
         try {
-          return (await ops.postReview(toolDeps, findings)) as Record<string, unknown>;
+          return (await ops.postReview(toolDeps, findings)) as SDKJsonValue;
         } catch (error) {
           if (isAuthError(error)) {
             throw error;
@@ -151,7 +151,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
           line: args.line as number,
           body: args.body as string,
         });
-        return result as Record<string, unknown>;
+        return result as SDKJsonValue;
       },
     },
   };

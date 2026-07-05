@@ -1,11 +1,14 @@
-import { Agent, CursorAgentError } from '@cursor/sdk';
+import { Agent, CursorAgentError, type SDKCustomTool } from '@cursor/sdk';
 import * as core from '@actions/core';
+
+const AGENT_TIMEOUT_MS = 45 * 60 * 1000;
 
 export async function runAgent(
   apiKey: string,
   model: string,
   prompt: string,
   cwd: string,
+  customTools: Record<string, SDKCustomTool>,
 ): Promise<void> {
   core.setSecret(apiKey);
 
@@ -13,7 +16,7 @@ export async function runAgent(
     await using agent = await Agent.create({
       apiKey,
       model: { id: model },
-      local: { cwd },
+      local: { cwd, customTools },
     });
 
     const run = await agent.send(prompt);
@@ -23,7 +26,16 @@ export async function runAgent(
       core.info(JSON.stringify(event));
     }
 
-    const result = await run.wait();
+    const result = await Promise.race([
+      run.wait(),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Agent timed out after 45 minutes')),
+          AGENT_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+
     if (result.status === 'error') {
       throw new Error(`Agent run failed: ${result.id}`);
     }
