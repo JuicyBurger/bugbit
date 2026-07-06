@@ -1,4 +1,3 @@
-import { getOctokit } from '@actions/github';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -95,17 +94,47 @@ export async function resolveEvent(params: ResolveEventParams): Promise<string> 
 
   const pullNumber = parsePrNumber(prNumber);
   const { owner, repo } = parseRepository(repository);
-  const octokit = getOctokit(token);
 
   let pull_request: unknown;
   try {
-    const response = await octokit.rest.pulls.get({
-      owner,
-      repo,
-      pull_number: pullNumber,
-    });
-    pull_request = response.data;
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const status = response.status;
+      if (status === 404) {
+        throw new EventResolutionError(
+          `Pull request #${pullNumber} not found in ${repository}. Check pr-number and repository.`,
+        );
+      }
+      if (status === 401) {
+        throw new EventResolutionError(
+          `Cannot fetch pull request #${pullNumber}: GitHub token was rejected by the API.`,
+        );
+      }
+      if (status === 403) {
+        throw new EventResolutionError(
+          `Cannot fetch pull request #${pullNumber}: token lacks permission to read this pull request.`,
+        );
+      }
+      throw new EventResolutionError(
+        `Cannot fetch pull request #${pullNumber}: GitHub API returned ${status}.`,
+      );
+    }
+
+    pull_request = await response.json();
   } catch (error) {
+    if (error instanceof EventResolutionError) {
+      throw error;
+    }
     const status = getHttpStatus(error);
     if (status === 404) {
       throw new EventResolutionError(

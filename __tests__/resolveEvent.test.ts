@@ -1,14 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { getOctokit } from '@actions/github';
 import { EventResolutionError, resolveEvent } from '../src/runtime/resolveEvent';
-
-jest.mock('@actions/github', () => ({
-  getOctokit: jest.fn(),
-}));
-
-const mockGetOctokit = jest.mocked(getOctokit);
 
 function writeEvent(dir: string, event: Record<string, unknown>): string {
   const eventPath = path.join(dir, 'event.json');
@@ -33,16 +26,16 @@ function makePullRequestResponse(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeOctokit(pullsGet: jest.Mock) {
-  return {
-    rest: {
-      pulls: {
-        get: pullsGet,
-        createReview: jest.fn(),
-        deletePendingReview: jest.fn(),
-      },
-    },
-  };
+function mockFetchJson(
+  body: unknown,
+  init: { ok?: boolean; status?: number } = {},
+): jest.Mock {
+  const { ok = true, status = 200 } = init;
+  return jest.fn().mockResolvedValue({
+    ok,
+    status,
+    json: jest.fn().mockResolvedValue(body),
+  });
 }
 
 describe('resolveEvent', () => {
@@ -50,15 +43,16 @@ describe('resolveEvent', () => {
   let runnerTemp: string;
   const originalRunnerTemp = process.env.RUNNER_TEMP;
   const originalEventName = process.env.GITHUB_EVENT_NAME;
+  const originalFetch = global.fetch;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bugbit-resolve-event-'));
     runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), 'bugbit-runner-temp-'));
     process.env.RUNNER_TEMP = runnerTemp;
-    mockGetOctokit.mockReset();
   });
 
   afterEach(() => {
+    global.fetch = originalFetch;
     fs.rmSync(tempDir, { recursive: true, force: true });
     fs.rmSync(runnerTemp, { recursive: true, force: true });
     if (originalRunnerTemp === undefined) {
@@ -77,6 +71,7 @@ describe('resolveEvent', () => {
     const eventPath = writeEvent(tempDir, {
       pull_request: makePullRequestResponse(),
     });
+    global.fetch = jest.fn();
 
     const resolvedPath = await resolveEvent({
       token: 'test-token',
@@ -85,7 +80,7 @@ describe('resolveEvent', () => {
     });
 
     expect(resolvedPath).toBe(eventPath);
-    expect(mockGetOctokit).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('fetches PR and writes temp file for workflow_dispatch with valid pr-number', async () => {
@@ -94,8 +89,7 @@ describe('resolveEvent', () => {
       inputs: { pr_number: '42' },
     });
     const pullRequest = makePullRequestResponse();
-    const pullsGet = jest.fn().mockResolvedValue({ data: pullRequest });
-    mockGetOctokit.mockReturnValue(makeOctokit(pullsGet) as unknown as ReturnType<typeof getOctokit>);
+    global.fetch = mockFetchJson(pullRequest);
 
     const resolvedPath = await resolveEvent({
       token: 'test-token',
@@ -104,12 +98,14 @@ describe('resolveEvent', () => {
       prNumber: '42',
     });
 
-    expect(mockGetOctokit).toHaveBeenCalledWith('test-token');
-    expect(pullsGet).toHaveBeenCalledWith({
-      owner: 'owner',
-      repo: 'repo',
-      pull_number: 42,
-    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/owner/repo/pulls/42',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-token',
+        }),
+      }),
+    );
     expect(resolvedPath).toBe(path.join(runnerTemp, 'bugbit-event-pr-42.json'));
     expect(fs.existsSync(resolvedPath)).toBe(true);
   });
@@ -119,6 +115,7 @@ describe('resolveEvent', () => {
     const eventPath = writeEvent(tempDir, {
       inputs: {},
     });
+    global.fetch = jest.fn();
 
     await expect(
       resolveEvent({
@@ -144,11 +141,12 @@ describe('resolveEvent', () => {
       }),
     ).rejects.toThrow(/pull_request/);
 
-    expect(mockGetOctokit).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('throws validation error for invalid pr-number before calling API', async () => {
     const eventPath = writeEvent(tempDir, { inputs: {} });
+    global.fetch = jest.fn();
 
     await expect(
       resolveEvent({
@@ -168,13 +166,12 @@ describe('resolveEvent', () => {
       }),
     ).rejects.toThrow(/Invalid pr-number/);
 
-    expect(mockGetOctokit).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('throws clear PR not found error when API returns 404', async () => {
     const eventPath = writeEvent(tempDir, { inputs: {} });
-    const pullsGet = jest.fn().mockRejectedValue({ status: 404 });
-    mockGetOctokit.mockReturnValue(makeOctokit(pullsGet) as unknown as ReturnType<typeof getOctokit>);
+    global.fetch = mockFetchJson(null, { ok: false, status: 404 });
 
     await expect(
       resolveEvent({
@@ -194,7 +191,7 @@ describe('resolveEvent', () => {
       }),
     ).rejects.toThrow(/Pull request #99 not found in owner\/repo/);
 
-    expect(pullsGet).toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalled();
   });
 
   it('writes temp file with pull_request fields matching API response', async () => {
@@ -215,8 +212,7 @@ describe('resolveEvent', () => {
         repo: { full_name: 'owner/repo' },
       },
     });
-    const pullsGet = jest.fn().mockResolvedValue({ data: pullRequest });
-    mockGetOctokit.mockReturnValue(makeOctokit(pullsGet) as unknown as ReturnType<typeof getOctokit>);
+    global.fetch = mockFetchJson(pullRequest);
 
     const resolvedPath = await resolveEvent({
       token: 'test-token',

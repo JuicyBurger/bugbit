@@ -46,8 +46,8 @@ inputs:
       Pull request number to review. On pull_request triggers GitHub includes
       the PR in the event payload — this input is optional and ignored. Required
       for workflow_dispatch when the event has no pull_request (the default for
-      manual runs). Pass from workflow_dispatch inputs, e.g.
-      pr-number: ${{ inputs.pr_number }}.
+      manual runs). In your consumer workflow, pass the dispatch input value
+      to this field (for example map your workflow's pr_number input).
     required: false
 
 runs:

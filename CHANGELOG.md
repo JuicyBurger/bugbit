@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-07-06
+
+### Fixed
+
+- `action.yml` no longer embeds `${{ inputs.pr_number }}` in the `pr-number` input description. That expression is only valid in workflow files, not action metadata, and caused `Failed to load action.yml` on all runs using `@v1`.
+- `resolveEvent` fetches pull requests via the GitHub REST API with `fetch` instead of `@actions/github`, so the main action bundle no longer contains an unresolved `@actions/github` import that broke `workflow_dispatch` at runtime.
+
 ## [1.1.0] - 2026-07-06
 
 ### Added
