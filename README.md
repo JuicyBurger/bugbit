@@ -13,6 +13,8 @@ bugbit is a lightweight, self-hosted GitHub Action that reviews pull requests us
 No walls of text at the bottom of the conversation — just line-anchored feedback from the agent you already trust.
 
 > **Version pinning:** Examples use `Vilancer/bugbit@v1` (latest v1.x). Pin to `@v1.0.0` or a commit SHA for an exact version.
+>
+> **Marketplace:** The listing name is `vilancer-bugbit` (GitHub user `bugbit` owns that short name). Workflows still reference the repo: `uses: Vilancer/bugbit@v1`.
 
 # Usage
 

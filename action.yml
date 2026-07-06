@@ -1,4 +1,4 @@
-name: 'bugbit'
+name: 'vilancer-bugbit'
 description: 'Review pull requests using your own Cursor agent'
 author: 'vilancer'
 branding:
