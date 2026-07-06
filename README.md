@@ -18,6 +18,26 @@ No walls of text at the bottom of the conversation — just line-anchored feedba
 
 # Usage
 
+## Supported workflow triggers
+
+| Trigger | Support | Notes |
+|---------|---------|-------|
+| `pull_request` | **Recommended** | Native support — GitHub provides `pull_request` in the event payload. No extra inputs. |
+| `workflow_dispatch` | Supported | Pass the `pr-number` input (see [Full workflow](#full-workflow-pr-open--manual-dispatch-checkout-head-sha)). Checkout the PR head SHA for accurate review scope. |
+| `push`, `schedule`, `issue_comment`, etc. | Not supported | bugbit requires pull request context. |
+
+If you trigger via `workflow_dispatch` without `pull_request` in the event and without `pr-number`, bugbit fails with:
+
+> bugbit requires pull request context. Pass `pr-number` when triggering via `workflow_dispatch`, or use `on: pull_request`. See README: Supported workflow triggers.
+
+## Workflow requirements
+
+1. **`actions/checkout` before bugbit** (required) — bugbit reviews the checked-out tree on the runner.
+2. **Checkout the PR head SHA** — use the PR head commit, not the merge ref, so the review matches the diff.
+3. **Permissions** — `contents: read`, `pull-requests: write` (see [Recommended permissions](#recommended-permissions)).
+4. **Runner** — `ubuntu-latest` (bundled `rg`; see [Limitations](#limitations)).
+5. **Fork PRs** — not supported (see [Fork pull requests](#fork-pull-requests)).
+
 Minimal workflow — review on every pull request:
 
 ```yaml
@@ -67,6 +87,10 @@ jobs:
     # When true, upload a JSONL stream log artifact after the agent finishes.
     # Requires actions: write on the job. Default: false
     save-stream-log: false
+
+    # Pull request number. Required for workflow_dispatch unless the event
+    # already includes pull_request. Ignored on pull_request triggers.
+    pr-number: ${{ github.event.pull_request.number }}
 ```
 
 | Input | Required | Default | Notes |
@@ -76,6 +100,7 @@ jobs:
 | `model` | no | `composer-2.5` | Cursor model id |
 | `review-modes` | no | `code-review` | Comma-separated: `code-review`, `security-review`, `simplify` |
 | `save-stream-log` | no | `false` | JSONL debug artifact; needs `actions: write` |
+| `pr-number` | no | — | Required for `workflow_dispatch` when the event has no `pull_request`; ignored otherwise |
 
 # Scenarios
 
@@ -145,16 +170,6 @@ jobs:
         with:
           ref: ${{ steps.pr.outputs.head_sha }}
 
-      # bugbit expects a pull_request event payload; synthesize one for manual runs.
-      - name: Synthesize pull_request event (manual runs)
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" \
-            | jq '{ pull_request: . }' > "${GITHUB_EVENT_PATH}"
-
       - uses: Vilancer/bugbit@v1
         with:
           cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
@@ -162,9 +177,27 @@ jobs:
           model: composer-2.5
           review-modes: code-review, security-review, simplify
           save-stream-log: true
+          pr-number: ${{ steps.pr.outputs.number }}
 ```
 
 Store `CURSOR_API_KEY` as a repository secret (`Settings → Secrets and variables → Actions`).
+
+### Legacy: synthesizing `GITHUB_EVENT_PATH` (deprecated)
+
+Before v1.1.0, `workflow_dispatch` required overwriting `GITHUB_EVENT_PATH` with a synthetic `pull_request` payload:
+
+```yaml
+- name: Synthesize pull_request event (manual runs)
+  if: github.event_name == 'workflow_dispatch'
+  env:
+    GH_TOKEN: ${{ github.token }}
+  run: |
+    set -euo pipefail
+    gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" \
+      | jq '{ pull_request: . }' > "${GITHUB_EVENT_PATH}"
+```
+
+This pattern is **deprecated** — pass `pr-number` to bugbit instead. The synthesis step will be removed from docs in a future release.
 
 ## Review modes
 
