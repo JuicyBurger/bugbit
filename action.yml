@@ -1,5 +1,7 @@
 name: 'vilancer-bugbit'
-description: 'Review pull requests using your own Cursor agent'
+description: >
+  Review pull requests using your own Cursor agent. Supports pull_request
+  (recommended) and workflow_dispatch triggers; see pr-number for manual runs.
 author: 'vilancer'
 branding:
   icon: 'search'
@@ -23,8 +25,11 @@ inputs:
     default: 'code-review'
   github-token:
     description: >
-      Token used to read PR context and post review comments. The consumer
-      workflow must grant permissions: contents: read, pull-requests: write.
+      Token used to read PR context and post review comments on pull_request
+      and workflow_dispatch runs. When workflow_dispatch has no pull_request in
+      the event payload, bugbit uses this token to fetch PR metadata via the API
+      if pr-number is set. The consumer workflow must grant permissions:
+      contents: read, pull-requests: write.
     required: true
     default: '${{ github.token }}'
   save-stream-log:
@@ -38,9 +43,11 @@ inputs:
     default: 'false'
   pr-number:
     description: >
-      Pull request number to review. Required for workflow_dispatch unless the
-      consumer workflow synthesizes pull_request in the GitHub event payload.
-      Ignored when the event already includes pull_request (e.g. pull_request trigger).
+      Pull request number to review. On pull_request triggers GitHub includes
+      the PR in the event payload — this input is optional and ignored. Required
+      for workflow_dispatch when the event has no pull_request (the default for
+      manual runs). Pass from workflow_dispatch inputs, e.g.
+      pr-number: ${{ inputs.pr_number }}.
     required: false
 
 runs:
