@@ -102,7 +102,7 @@ describe('assertReviewPermissions', () => {
     });
   });
 
-  it('throws when event is not a pull_request', async () => {
+  it('throws actionable error when event lacks pull_request context', async () => {
     const deps = {
       ...baseDeps(),
       eventPath: writeEvent(tempDir, { action: 'push' }),
@@ -110,7 +110,64 @@ describe('assertReviewPermissions', () => {
     const octokit = makeOctokit({});
 
     await expect(preflight.assertReviewPermissions(deps, octokit)).rejects.toThrow(
-      'not running on a pull_request event',
+      'bugbit requires pull request context',
+    );
+    await expect(preflight.assertReviewPermissions(deps, octokit)).rejects.toThrow(
+      'on: pull_request',
+    );
+    expect(octokit.rest.pulls.get).not.toHaveBeenCalled();
+  });
+
+  it('throws workflow_dispatch-specific error when GITHUB_EVENT_NAME is workflow_dispatch', async () => {
+    const previousEventName = process.env.GITHUB_EVENT_NAME;
+    process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+
+    try {
+      const deps = {
+        ...baseDeps(),
+        eventPath: writeEvent(tempDir, { inputs: { pr_number: '42' } }),
+      };
+      const octokit = makeOctokit({});
+
+      await expect(preflight.assertReviewPermissions(deps, octokit)).rejects.toThrow(
+        'Pass `pr-number` when triggering via `workflow_dispatch`',
+      );
+      expect(octokit.rest.pulls.get).not.toHaveBeenCalled();
+    } finally {
+      if (previousEventName === undefined) {
+        delete process.env.GITHUB_EVENT_NAME;
+      } else {
+        process.env.GITHUB_EVENT_NAME = previousEventName;
+      }
+    }
+  });
+
+  it('probes the PR number from a resolved temp event path', async () => {
+    const eventPath = writeEvent(tempDir, {
+      inputs: { pr_number: '99' },
+      pull_request: {
+        number: 99,
+        head: { repo: { full_name: 'owner/repo' }, ref: 'feature', sha: 'abc123' },
+        base: { repo: { full_name: 'owner/repo' }, ref: 'main' },
+      },
+    });
+    const octokit = makeOctokit({
+      get: jest.fn().mockResolvedValue({ data: { number: 99 } }),
+    });
+
+    await expect(
+      preflight.assertReviewPermissions(
+        { token: 'test-token', eventPath, repository: 'owner/repo' },
+        octokit,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(octokit.rest.pulls.get).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'owner',
+        repo: 'repo',
+        pull_number: 99,
+      }),
     );
   });
 });

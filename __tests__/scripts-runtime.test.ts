@@ -67,6 +67,21 @@ describe('scripts runtime smoke', () => {
     });
   });
 
+  it('event.mjs dynamic import', () => {
+    const stdout = execFileSync(
+      'node',
+      [
+        '-e',
+        "import('./scripts/lib/event.mjs').then((m) => console.log(JSON.stringify({ assertPullRequestContext: typeof m.assertPullRequestContext, pullRequestContextErrorMessage: typeof m.pullRequestContextErrorMessage })))",
+      ],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+    expect(JSON.parse(stdout.trim())).toEqual({
+      assertPullRequestContext: 'function',
+      pullRequestContextErrorMessage: 'function',
+    });
+  });
+
   it('post-review.mjs empty findings', () => {
     const findingsPath = join(tempDir, 'findings-empty.json');
     writeFileSync(findingsPath, JSON.stringify({ findings: [] }));
