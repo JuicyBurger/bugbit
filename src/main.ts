@@ -16,6 +16,7 @@ import {
   isForkPullRequest,
   prefetchPrData,
 } from './github/tools';
+import { resolveEvent } from './runtime/resolveEvent';
 import { bootstrapRipgrep } from './runtime/sdkBootstrap';
 
 async function run(): Promise<void> {
@@ -33,8 +34,16 @@ async function run(): Promise<void> {
     const modesInput = core.getInput('review-modes') || 'code-review';
     const saveStreamLog = core.getBooleanInput('save-stream-log');
 
-    const eventPath = process.env.GITHUB_EVENT_PATH ?? '';
+    const prNumber = core.getInput('pr-number');
+    const rawEventPath = process.env.GITHUB_EVENT_PATH ?? '';
     const repository = process.env.GITHUB_REPOSITORY ?? '';
+
+    const eventPath = await resolveEvent({
+      token: githubToken,
+      repository,
+      eventPath: rawEventPath,
+      prNumber: prNumber || undefined,
+    });
 
     if (isForkPullRequest(eventPath)) {
       core.setFailed(

@@ -36,6 +36,12 @@ inputs:
       Requires actions: write on the consumer workflow job.
     required: false
     default: 'false'
+  pr-number:
+    description: >
+      Pull request number to review. Required for workflow_dispatch unless the
+      consumer workflow synthesizes pull_request in the GitHub event payload.
+      Ignored when the event already includes pull_request (e.g. pull_request trigger).
+    required: false
 
 runs:
   using: 'node24'

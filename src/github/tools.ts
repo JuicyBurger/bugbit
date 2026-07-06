@@ -2,6 +2,7 @@ import type { SDKCustomTool, SDKJsonValue } from '@cursor/sdk';
 import * as core from '@actions/core';
 import * as fs from 'fs';
 import * as path from 'path';
+import { pathToFileURL } from 'url';
 import { dynamicImport } from '../runtime/dynamicImport';
 import { resolveActionModuleUrl } from '../runtime/resolveActionModule';
 import type { BugbitToolDeps, OpsDeps, PrefetchedPrData } from './types';
@@ -26,6 +27,12 @@ type PreflightModule = {
   formatPermissionErrorMessage: (error: unknown) => string;
 };
 
+type EventModule = {
+  assertPullRequestContext: (eventPath: string) => unknown;
+};
+
+const eventPromises = new Map<string, Promise<EventModule>>();
+
 function loadOps(actionPath: string): Promise<OpsModule> {
   let promise = opsPromises.get(actionPath);
   if (!promise) {
@@ -46,6 +53,23 @@ function loadPreflight(actionPath: string): Promise<PreflightModule> {
   return promise;
 }
 
+function loadEventModule(actionPath: string): Promise<EventModule> {
+  let promise = eventPromises.get(actionPath);
+  if (!promise) {
+    const eventUrl = pathToFileURL(
+      path.join(actionPath, 'scripts', 'lib', 'event.mjs'),
+    ).href;
+    promise = dynamicImport<EventModule>(eventUrl);
+    eventPromises.set(actionPath, promise);
+  }
+  return promise;
+}
+
+async function assertPullRequestContext(deps: BugbitToolDeps): Promise<void> {
+  const { assertPullRequestContext: assertContext } = await loadEventModule(deps.actionPath);
+  assertContext(deps.eventPath);
+}
+
 function toOpsDeps(deps: BugbitToolDeps): OpsDeps {
   return {
     token: deps.githubToken,
@@ -63,6 +87,12 @@ function isDiffTooLarge(error: unknown): error is Error & { code: string } {
 }
 
 export async function checkReviewPermissions(deps: BugbitToolDeps): Promise<void> {
+  try {
+    await assertPullRequestContext(deps);
+  } catch (error) {
+    throw error instanceof Error ? error : new Error(String(error));
+  }
+
   const { assertReviewPermissions, formatPermissionErrorMessage } = await loadPreflight(
     deps.actionPath,
   );
