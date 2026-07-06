@@ -53,4 +53,30 @@ describe('isForkPullRequest', () => {
     const eventPath = writeEvent(tempDir, { action: 'push' });
     expect(isForkPullRequest(eventPath)).toBe(false);
   });
+
+  it('returns true for resolved event path with fork PR data', () => {
+    const eventPath = writeEvent(tempDir, {
+      action: 'workflow_dispatch',
+      inputs: { pr_number: '42' },
+      pull_request: {
+        head: { repo: { full_name: 'contributor/repo' } },
+        base: { repo: { full_name: 'owner/repo' } },
+      },
+    });
+
+    expect(isForkPullRequest(eventPath)).toBe(true);
+  });
+
+  it('returns false for resolved event path with same-repo PR data', () => {
+    const eventPath = writeEvent(tempDir, {
+      action: 'workflow_dispatch',
+      inputs: { pr_number: '42' },
+      pull_request: {
+        head: { repo: { full_name: 'owner/repo' } },
+        base: { repo: { full_name: 'owner/repo' } },
+      },
+    });
+
+    expect(isForkPullRequest(eventPath)).toBe(false);
+  });
 });
