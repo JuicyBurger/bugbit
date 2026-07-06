@@ -6,7 +6,7 @@ export const ALLOWED_MODES = ['code-review', 'security-review', 'simplify'] as c
 export type ReviewMode = (typeof ALLOWED_MODES)[number];
 
 export const SKILL_BY_MODE: Record<ReviewMode, string> = {
-  'code-review': '/review',
+  'code-review': '/code-review',
   'security-review': '/review-security',
   simplify: '/simplify',
 };

@@ -49,7 +49,7 @@ describe('buildSkillPrompt', () => {
     const { prompt, modes } = buildSkillPrompt('code-review, security-review', promptsDir, actionPath);
 
     expect(modes).toEqual(['code-review', 'security-review']);
-    expect(prompt.startsWith('/review\n/review-security\n\n')).toBe(true);
+    expect(prompt.startsWith('/code-review\n/review-security\n\n')).toBe(true);
     expect(prompt).toContain(actionPath);
     expect(prompt).toContain('get_pr_context tool');
   });

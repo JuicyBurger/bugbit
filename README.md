@@ -7,12 +7,12 @@ bugbit is a lightweight, self-hosted GitHub Action that reviews pull requests us
 ## How it works
 
 1. Validates `GITHUB_TOKEN` permissions and prefetches PR context and diff
-2. Invokes Cursor built-in review skills (`/review`, `/review-security`, `/simplify`) with a GitHub Actions overlay for read-only, line-anchored findings
+2. Invokes Cursor built-in review skills (`/code-review`, `/review-security`, `/simplify`) with a GitHub Actions overlay for read-only, line-anchored findings
 3. Posts findings as **inline PR review comments** on the exact diff lines via custom tools (`post_review`)
 
 No walls of text at the bottom of the conversation — just line-anchored feedback from the agent you already trust.
 
-> **Pre-release:** Examples below use `Vilancer/bugbit@main`. Pin to a release tag or commit SHA once tagged for production workflows.
+> **Version pinning:** Examples use `Vilancer/bugbit@v1` (latest v1.x). Pin to `@v1.0.0` or a commit SHA for an exact version.
 
 # Usage
 
@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: Vilancer/bugbit@main
+      - uses: Vilancer/bugbit@v1
         with:
           cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
 ```
@@ -44,7 +44,7 @@ jobs:
 # Inputs
 
 ```yaml
-- uses: Vilancer/bugbit@main
+- uses: Vilancer/bugbit@v1
   with:
     # Cursor API key (required). Store as a repository secret.
     cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
@@ -87,7 +87,7 @@ permissions:
 steps:
   - uses: actions/checkout@v6
 
-  - uses: Vilancer/bugbit@main
+  - uses: Vilancer/bugbit@v1
     with:
       cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
       github-token: ${{ github.token }}
@@ -153,7 +153,7 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/pulls/${{ steps.pr.outputs.number }}" \
             | jq '{ pull_request: . }' > "${GITHUB_EVENT_PATH}"
 
-      - uses: Vilancer/bugbit@main
+      - uses: Vilancer/bugbit@v1
         with:
           cursor-api-key: ${{ secrets.CURSOR_API_KEY }}
           github-token: ${{ github.token }}
@@ -170,7 +170,7 @@ Each `review-modes` value maps to a Cursor built-in skill:
 
 | Mode | Cursor skill | Purpose |
 |------|--------------|---------|
-| `code-review` | `/review` | General code review |
+| `code-review` | `/code-review` | General code review |
 | `security-review` | `/review-security` | Security-focused review |
 | `simplify` | `/simplify` | Complexity and simplification suggestions |
 
@@ -222,7 +222,7 @@ The action uses the `node24` runtime (`action.yml`). Use `runs-on: ubuntu-latest
 
 ### Action pinning
 
-`@main` tracks the latest commit and can change without notice. Pin to a release tag or full commit SHA in production workflows once releases are available.
+`@v1` tracks the latest compatible v1 release. Pin to `@v1.0.0` or a full commit SHA for an exact version.
 
 # Contributing
 
