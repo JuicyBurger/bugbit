@@ -94,6 +94,7 @@ describe('scripts runtime smoke', () => {
     expect(status).toBe(0);
     expect(stdout).toContain('"posted":[]');
     expect(stdout).toContain('"reviewId":null');
+    expect(stdout).toContain('"cleanSummary":false');
     expect(stdout).not.toContain(importError);
   });
 
