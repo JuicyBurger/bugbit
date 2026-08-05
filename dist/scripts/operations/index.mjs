@@ -30619,12 +30619,12 @@ class Octokit {
 }
 
 
-;// CONCATENATED MODULE: ./node_modules/.pnpm/@octokit+plugin-rest-endpoint-methods@17.0.0_@octokit+core@7.0.6/node_modules/@octokit/plugin-rest-endpoint-methods/dist-src/version.js
+;// CONCATENATED MODULE: ./node_modules/.pnpm/@octokit+plugin-rest-endpoi_88f1cfdccbcd12f9bd89a662a3d08bce/node_modules/@octokit/plugin-rest-endpoint-methods/dist-src/version.js
 const dist_src_version_VERSION = "17.0.0";
 
 //# sourceMappingURL=version.js.map
 
-;// CONCATENATED MODULE: ./node_modules/.pnpm/@octokit+plugin-rest-endpoint-methods@17.0.0_@octokit+core@7.0.6/node_modules/@octokit/plugin-rest-endpoint-methods/dist-src/generated/endpoints.js
+;// CONCATENATED MODULE: ./node_modules/.pnpm/@octokit+plugin-rest-endpoi_88f1cfdccbcd12f9bd89a662a3d08bce/node_modules/@octokit/plugin-rest-endpoint-methods/dist-src/generated/endpoints.js
 const Endpoints = {
   actions: {
     addCustomLabelsToSelfHostedRunnerForOrg: [
@@ -32918,7 +32918,7 @@ var endpoints_default = Endpoints;
 
 //# sourceMappingURL=endpoints.js.map
 
-;// CONCATENATED MODULE: ./node_modules/.pnpm/@octokit+plugin-rest-endpoint-methods@17.0.0_@octokit+core@7.0.6/node_modules/@octokit/plugin-rest-endpoint-methods/dist-src/endpoints-to-methods.js
+;// CONCATENATED MODULE: ./node_modules/.pnpm/@octokit+plugin-rest-endpoi_88f1cfdccbcd12f9bd89a662a3d08bce/node_modules/@octokit/plugin-rest-endpoint-methods/dist-src/endpoints-to-methods.js
 
 const endpointMethodsMap = /* @__PURE__ */ new Map();
 for (const [scope, endpoints] of Object.entries(endpoints_default)) {
@@ -33044,7 +33044,7 @@ function decorate(octokit, scope, methodName, defaults, decorations) {
 
 //# sourceMappingURL=endpoints-to-methods.js.map
 
-;// CONCATENATED MODULE: ./node_modules/.pnpm/@octokit+plugin-rest-endpoint-methods@17.0.0_@octokit+core@7.0.6/node_modules/@octokit/plugin-rest-endpoint-methods/dist-src/index.js
+;// CONCATENATED MODULE: ./node_modules/.pnpm/@octokit+plugin-rest-endpoi_88f1cfdccbcd12f9bd89a662a3d08bce/node_modules/@octokit/plugin-rest-endpoint-methods/dist-src/index.js
 
 
 function restEndpointMethods(octokit) {
@@ -33812,13 +33812,37 @@ function validateFindingShape(finding, index) {
   };
 }
 
+const DEFAULT_CLEAN_SUMMARY_BODY =
+  '## bugbit: LGTM — no findings\n\nNo issues reported on this diff.';
+
 /**
  * @param {OpsDeps} deps
  * @param {unknown[]} findings
  */
 async function postReview(deps, findings) {
   if (!Array.isArray(findings) || findings.length === 0) {
-    return { posted: [], reviewId: null };
+    if (!deps.postCleanSummary) {
+      return { posted: [], reviewId: null, cleanSummary: false };
+    }
+
+    const pr = requirePullRequest(deps.eventPath);
+    const octokit = createClient(deps.token);
+    const { owner, repo } = parseRepo(deps.repository);
+    const body =
+      typeof deps.cleanSummaryBody === 'string' && deps.cleanSummaryBody.trim()
+        ? deps.cleanSummaryBody.trim()
+        : DEFAULT_CLEAN_SUMMARY_BODY;
+
+    const { data } = await octokit.rest.pulls.createReview({
+      owner,
+      repo,
+      pull_number: pr.number,
+      commit_id: pr.head.sha,
+      event: 'COMMENT',
+      body,
+    });
+
+    return { posted: [], reviewId: data.id, cleanSummary: true };
   }
 
   const pr = requirePullRequest(deps.eventPath);
