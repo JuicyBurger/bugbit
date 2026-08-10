@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-08-10
+
+### Fixed
+
+- Paginate `pulls.listFiles` when prefetching the PR diff and building the comment line map. GitHub returns 30 files per page by default; PRs with more than 30 changed files were silently truncated, so reviews missed later files and findings on those paths failed line-map validation.
+
 ## [1.2.0] - 2026-08-05
 
 ### Added
