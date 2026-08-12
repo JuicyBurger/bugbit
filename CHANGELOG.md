@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-08-12
+
+### Added
+
+- Prefetched PR context now includes `title` and `body` so the agent can stay aligned with author intent.
+- Progressive diff slim when the serialized patch JSON exceeds 1MB: `diffMode` is `full`, then `hunk_ranges` (ranges without line bodies), then `paths_only`. Large PRs always get a usable file inventory instead of `DIFF_TOO_LARGE`.
+
+### Changed
+
+- System prompt: intent anchoring via title/body, prefer high-impact findings, large-PR coverage in one `post_review` batch, compact finding bodies with optional GitHub suggestion blocks.
+- Review summary body is now `bugbit: N finding(s)` instead of a generic label.
+
 ## [1.2.1] - 2026-08-10
 
 ### Fixed

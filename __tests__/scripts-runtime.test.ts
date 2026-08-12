@@ -8,6 +8,8 @@ const repoRoot = join(__dirname, '..');
 const mockPrEvent = {
   pull_request: {
     number: 1,
+    title: 'Test PR',
+    body: '## Summary\n- test',
     head: { ref: 'feature/test', sha: 'abc123' },
     base: { ref: 'main', sha: 'def456' },
   },
@@ -110,6 +112,27 @@ describe('scripts runtime smoke', () => {
     expect(status).toBe(1);
     expect(stdout).toContain('"code":"GET_DIFF_ERROR"');
     expect(stdout).not.toContain(importError);
+  });
+
+  it('pr-context.mjs returns title and body', () => {
+    const eventPath = join(tempDir, 'event.json');
+    writeFileSync(eventPath, JSON.stringify(mockPrEvent));
+
+    const { stdout, status } = runNodeScript('scripts/pr-context.mjs', [], {
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_TOKEN: 'unused',
+      GITHUB_REPOSITORY: 'owner/repo',
+    });
+
+    expect(status).toBe(0);
+    const parsed = JSON.parse(stdout.trim());
+    expect(parsed).toMatchObject({
+      number: 1,
+      title: 'Test PR',
+      body: '## Summary\n- test',
+      headRef: 'feature/test',
+      baseRef: 'main',
+    });
   });
 
   it('post-inline-comment.mjs passes import, fails at args', () => {

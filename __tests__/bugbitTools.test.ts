@@ -7,10 +7,18 @@ jest.mock('../src/runtime/dynamicImport');
 
 const mockOpsSource = `
 export async function getPrContext() {
-  return { number: 42, headRef: 'feat', baseRef: 'main', headSha: 'abc', baseSha: 'def' };
+  return {
+    number: 42,
+    headRef: 'feat',
+    baseRef: 'main',
+    headSha: 'abc',
+    baseSha: 'def',
+    title: 'Add feature',
+    body: '## Summary\\n- does things',
+  };
 }
 export async function getDiff() {
-  return { files: [{ path: 'src/a.ts', status: 'modified' }] };
+  return { diffMode: 'full', files: [{ path: 'src/a.ts', status: 'modified' }] };
 }
 export async function postReview(_deps, findings) {
   return { posted: findings, reviewId: null };
@@ -106,6 +114,8 @@ describe('createBugbitTools', () => {
       baseRef: 'main',
       headSha: 'abc',
       baseSha: 'def',
+      title: 'Add feature',
+      body: '## Summary\n- does things',
     });
   });
 
@@ -167,8 +177,13 @@ describe('prefetchPrData', () => {
       baseRef: 'main',
       headSha: 'abc',
       baseSha: 'def',
+      title: 'Add feature',
+      body: '## Summary\n- does things',
     });
-    expect(result.diff).toEqual({ files: [{ path: 'src/a.ts', status: 'modified' }] });
+    expect(result.diff).toEqual({
+      diffMode: 'full',
+      files: [{ path: 'src/a.ts', status: 'modified' }],
+    });
   });
 });
 

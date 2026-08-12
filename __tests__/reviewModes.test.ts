@@ -75,5 +75,7 @@ describe('buildSkillPrompt', () => {
     expect(prompt).toContain('<prefetched_pr_data>');
     expect(prompt).toContain('"number": 1');
     expect(prompt).toContain('You MUST call post_review before finishing');
+    expect(prompt).toContain('Use title and body as author intent');
+    expect(prompt).toContain('cover multiple risk areas in one batch');
   });
 });

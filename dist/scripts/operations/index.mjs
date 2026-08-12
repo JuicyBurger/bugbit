@@ -33673,6 +33673,79 @@ function mapPullRequestFiles(fileList) {
 }
 
 /**
+ * Drop per-line hunk bodies; keep hunk range headers only.
+ * @param {Array<Record<string, unknown>>} files
+ */
+function slimFilesToHunkRanges(files) {
+  return files.map((file) => {
+    if (file.status === 'deleted' || !Array.isArray(file.hunks)) {
+      const entry = { path: file.path, status: file.status };
+      if (file.previous_filename) {
+        entry.previous_filename = file.previous_filename;
+      }
+      return entry;
+    }
+
+    const entry = {
+      path: file.path,
+      status: file.status,
+      hunks: file.hunks.map((hunk) => ({
+        oldStart: hunk.oldStart,
+        oldLines: hunk.oldLines,
+        newStart: hunk.newStart,
+        newLines: hunk.newLines,
+      })),
+    };
+
+    if (file.previous_filename) {
+      entry.previous_filename = file.previous_filename;
+    }
+
+    return entry;
+  });
+}
+
+/**
+ * Keep path/status (+ rename) only — no hunks.
+ * @param {Array<Record<string, unknown>>} files
+ */
+function slimFilesToPathsOnly(files) {
+  return files.map((file) => {
+    const entry = { path: file.path, status: file.status };
+    if (file.previous_filename) {
+      entry.previous_filename = file.previous_filename;
+    }
+    return entry;
+  });
+}
+
+/**
+ * Pick the richest diff payload that fits under DIFF_SIZE_LIMIT.
+ * Never fails for size alone — always returns a usable inventory.
+ *
+ * @param {Array<Record<string, unknown>>} fullFiles
+ * @param {number} [limit]
+ * @returns {{ diffMode: 'full' | 'hunk_ranges' | 'paths_only', files: Array<Record<string, unknown>> }}
+ */
+function buildSizedDiff(fullFiles, limit = DIFF_SIZE_LIMIT) {
+  const fullOutput = { diffMode: 'full', files: fullFiles };
+  if (JSON.stringify(fullOutput).length <= limit) {
+    return fullOutput;
+  }
+
+  const hunkRangesFiles = slimFilesToHunkRanges(fullFiles);
+  const hunkRangesOutput = { diffMode: 'hunk_ranges', files: hunkRangesFiles };
+  if (JSON.stringify(hunkRangesOutput).length <= limit) {
+    return hunkRangesOutput;
+  }
+
+  return {
+    diffMode: 'paths_only',
+    files: slimFilesToPathsOnly(fullFiles),
+  };
+}
+
+/**
  * @param {Array<{ path: string, status: string, hunks?: Array<{ lines: Array<{ type: string, newLine?: number }> }> }>} files
  * @returns {Map<string, Set<number>>}
  */
@@ -33749,7 +33822,7 @@ async function fetchDiffLineMap(octokit, owner, repo, pullNumber) {
 
 
 /**
- * @typedef {{ token: string, eventPath: string, repository: string }} OpsDeps
+ * @typedef {{ token: string, eventPath: string, repository: string, postCleanSummary?: boolean, cleanSummaryBody?: string }} OpsDeps
  */
 
 /**
@@ -33763,6 +33836,8 @@ async function getPrContext(deps) {
     baseRef: pr.base.ref,
     headSha: pr.head.sha,
     baseSha: pr.base.sha,
+    title: typeof pr.title === 'string' ? pr.title : '',
+    body: typeof pr.body === 'string' ? pr.body : '',
   };
 }
 
@@ -33777,15 +33852,7 @@ async function getDiff(deps) {
   const fileList = await listPullRequestFiles(octokit, owner, repo, pr.number);
   const files = mapPullRequestFiles(fileList);
 
-  const output = { files };
-
-  if (JSON.stringify(output).length > DIFF_SIZE_LIMIT) {
-    const err = new Error(`Diff JSON exceeds ${DIFF_SIZE_LIMIT} bytes`);
-    err.code = 'DIFF_TOO_LARGE';
-    throw err;
-  }
-
-  return output;
+  return buildSizedDiff(files);
 }
 
 /**
@@ -33904,7 +33971,7 @@ async function postReview(deps, findings) {
     pull_number: pr.number,
     commit_id: pr.head.sha,
     event: 'COMMENT',
-    body: 'bugbit review findings',
+    body: `bugbit: ${validFindings.length} finding(s)`,
     comments: validFindings.map((f) => ({
       path: f.path,
       line: f.line,
