@@ -29152,7 +29152,9 @@ __nccwpck_require__.d(__webpack_exports__, {
   Gw: () => (/* binding */ getDiff),
   C0: () => (/* binding */ getPrContext),
   Zb: () => (/* binding */ postInlineComment),
-  Xc: () => (/* binding */ postReview)
+  Xc: () => (/* binding */ postReview),
+  CD: () => (/* binding */ setPrLabels),
+  Gg: () => (/* binding */ updatePrDescription)
 });
 
 ;// CONCATENATED MODULE: external "node:fs"
@@ -33822,7 +33824,15 @@ async function fetchDiffLineMap(octokit, owner, repo, pullNumber) {
 
 
 /**
- * @typedef {{ token: string, eventPath: string, repository: string, postCleanSummary?: boolean, cleanSummaryBody?: string }} OpsDeps
+ * @typedef {{
+ *   token: string,
+ *   eventPath: string,
+ *   repository: string,
+ *   postCleanSummary?: boolean,
+ *   cleanSummaryBody?: string,
+ *   autoDescribe?: boolean,
+ *   describeLabels?: string[]
+ * }} OpsDeps
  */
 
 /**
@@ -34032,8 +34042,90 @@ async function postInlineComment(deps, { path, line, body }) {
   };
 }
 
+/**
+ * Update the PR title and/or body.
+ * @param {OpsDeps} deps
+ * @param {{ title?: string, body: string }} input
+ */
+async function updatePrDescription(deps, { title, body }) {
+  if (!body || typeof body !== 'string' || body.trim().length === 0) {
+    return {
+      error: {
+        code: 'INVALID_ARGS',
+        message: 'Missing required body',
+      },
+    };
+  }
+
+  const pr = requirePullRequest(deps.eventPath);
+  const octokit = createClient(deps.token);
+  const { owner, repo } = parseRepo(deps.repository);
+
+  const params = {
+    owner,
+    repo,
+    pull_number: pr.number,
+    body,
+  };
+  if (title && typeof title === 'string' && title.trim().length > 0) {
+    params.title = title;
+  }
+
+  const { data } = await octokit.rest.pulls.update(params);
+  return { updated: true, id: data.id };
+}
+
+/**
+ * Apply a list of labels to the PR (uses the issues API, requires issues: write).
+ * @param {OpsDeps} deps
+ * @param {{ labels: string[] }} input
+ */
+async function setPrLabels(deps, { labels }) {
+  if (!Array.isArray(labels) || labels.length === 0) {
+    return {
+      error: {
+        code: 'INVALID_ARGS',
+        message: 'labels must be a non-empty array',
+      },
+    };
+  }
+
+  const pr = requirePullRequest(deps.eventPath);
+  const octokit = createClient(deps.token);
+  const { owner, repo } = parseRepo(deps.repository);
+
+  // addLabels 422s if a label name does not exist. Create missing ones so
+  // inferred type / review-effort labels work on first use.
+  for (const name of labels) {
+    try {
+      await octokit.rest.issues.getLabel({ owner, repo, name });
+    } catch (error) {
+      const status = error && typeof error === 'object' && 'status' in error ? error.status : undefined;
+      if (status !== 404) {
+        throw error;
+      }
+      await octokit.rest.issues.createLabel({
+        owner,
+        repo,
+        name,
+        color: 'ededed',
+      });
+    }
+  }
+
+  await octokit.rest.issues.addLabels({
+    owner,
+    repo,
+    issue_number: pr.number,
+    labels,
+  });
+  return { applied: labels };
+}
+
 var __webpack_exports__getDiff = __webpack_exports__.Gw;
 var __webpack_exports__getPrContext = __webpack_exports__.C0;
 var __webpack_exports__postInlineComment = __webpack_exports__.Zb;
 var __webpack_exports__postReview = __webpack_exports__.Xc;
-export { __webpack_exports__getDiff as getDiff, __webpack_exports__getPrContext as getPrContext, __webpack_exports__postInlineComment as postInlineComment, __webpack_exports__postReview as postReview };
+var __webpack_exports__setPrLabels = __webpack_exports__.CD;
+var __webpack_exports__updatePrDescription = __webpack_exports__.Gg;
+export { __webpack_exports__getDiff as getDiff, __webpack_exports__getPrContext as getPrContext, __webpack_exports__postInlineComment as postInlineComment, __webpack_exports__postReview as postReview, __webpack_exports__setPrLabels as setPrLabels, __webpack_exports__updatePrDescription as updatePrDescription };

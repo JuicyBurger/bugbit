@@ -802,6 +802,8 @@ function toOpsDeps(deps) {
         repository: deps.repository,
         postCleanSummary: deps.postCleanSummary,
         cleanSummaryBody: deps.cleanSummaryBody,
+        autoDescribe: deps.autoDescribe,
+        describeLabels: deps.describeLabels,
     };
 }
 async function checkReviewPermissions(deps) {
@@ -939,6 +941,49 @@ function createBugbitTools(deps) {
                 return result;
             },
         },
+        update_pr_description: {
+            description: 'Updates the PR title and/or body with generated description. Requires pull-requests: write.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string' },
+                    body: { type: 'string' },
+                },
+                required: ['body'],
+                additionalProperties: false,
+            },
+            execute: async (args) => {
+                core.info('[bugbit] update_pr_description called');
+                const ops = await loadOps(deps.actionPath);
+                const result = await ops.updatePrDescription(toolDeps, {
+                    body: args.body,
+                    ...(args.title ? { title: args.title } : {}),
+                });
+                return result;
+            },
+        },
+        set_pr_labels: {
+            description: 'Applies labels to the PR (issues API). Requires issues: write permission.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    labels: {
+                        type: 'array',
+                        items: { type: 'string' },
+                    },
+                },
+                required: ['labels'],
+                additionalProperties: false,
+            },
+            execute: async (args) => {
+                core.info(`[bugbit] set_pr_labels called with ${args.labels.length} label(s)`);
+                const ops = await loadOps(deps.actionPath);
+                const result = await ops.setPrLabels(toolDeps, {
+                    labels: args.labels,
+                });
+                return result;
+            },
+        },
     };
 }
 
@@ -1012,6 +1057,15 @@ async function run() {
             : core.getBooleanInput('post-clean-summary');
         const cleanSummaryBody = core.getInput('clean-summary-body') ||
             '## bugbit: LGTM — no findings\n\nNo issues reported on this diff.';
+        const autoDescribe = (core.getInput('auto-describe') || 'false').toString().toLowerCase() === 'true';
+        const describeLabelsRaw = (core.getInput('describe-labels') || '').trim();
+        const describeLabels = describeLabelsRaw
+            .split(',')
+            .map((label) => label.trim())
+            .filter(Boolean);
+        if (autoDescribe && describeLabels.length > 0) {
+            core.warning('describe-labels configured — consumer job must include permissions: issues: write and pull-requests: write');
+        }
         const prNumber = core.getInput('pr-number');
         const rawEventPath = process.env.GITHUB_EVENT_PATH ?? '';
         const repository = process.env.GITHUB_REPOSITORY ?? '';
@@ -1035,6 +1089,8 @@ async function run() {
             actionPath,
             postCleanSummary,
             cleanSummaryBody,
+            autoDescribe,
+            describeLabels,
         };
         if (saveStreamLog) {
             core.info('save-stream-log enabled — consumer workflow must include actions: write');
@@ -1050,11 +1106,27 @@ async function run() {
         (0, tools_1.copyPermissionsToWorkspace)(actionPath, cwd);
         const promptsDir = path.join(actionPath, 'prompts');
         const prefetched = await (0, tools_1.prefetchPrData)(toolDeps);
-        const { prompt, modes } = (0, reviewModes_1.buildSkillPrompt)(modesInput, promptsDir, actionPath, prefetched);
         const customTools = (0, tools_1.createBugbitTools)(toolDeps);
-        core.info(`Starting Cursor agent (model: ${model}, modes: ${modes.join(', ')})`);
-        const { runId, streamLogPath } = await (0, cursorAgent_1.runAgent)(apiKey, model, prompt, cwd, customTools, { saveStreamLog });
-        if (saveStreamLog && streamLogPath) {
+        // Determine which passes to run. `review-modes` defaults to "code-review",
+        // so a pure-describe run must explicitly pass review-modes as an empty string.
+        const reviewModes = (0, reviewModes_1.parseReviewModes)(modesInput);
+        const runDescribe = autoDescribe;
+        const runReview = reviewModes.length > 0;
+        if (!runDescribe && !runReview) {
+            core.setFailed('bugbit has nothing to do: auto-describe is false and review-modes is empty. ' +
+                'Set auto-describe to true and/or provide at least one review-modes value.');
+            return;
+        }
+        async function runPass(label, prompt, saveLog) {
+            core.info(`Starting Cursor agent (model: ${model}, pass: ${label})`);
+            const result = await (0, cursorAgent_1.runAgent)(apiKey, model, prompt, cwd, customTools, { saveStreamLog: saveLog });
+            core.info(`${label} pass completed: run ${result.runId}`);
+            return result;
+        }
+        async function uploadStreamLog(streamLogPath, runId) {
+            if (!saveStreamLog || !streamLogPath || !runId) {
+                return;
+            }
             try {
                 const artifactName = (0, artifactUpload_1.streamLogArtifactName)({
                     agentRunId: runId,
@@ -1066,8 +1138,20 @@ async function run() {
             }
             catch (error) {
                 core.setFailed((0, artifactUpload_1.artifactUploadErrorMessage)(error));
-                return;
+                throw error;
             }
+        }
+        // Describe pass: updates the PR body (and optionally labels) before review.
+        if (runDescribe) {
+            const { prompt: describePrompt } = (0, reviewModes_1.buildDescribePrompt)(promptsDir, actionPath, prefetched, describeLabels);
+            const describeRun = await runPass('describe', describePrompt, saveStreamLog);
+            await uploadStreamLog(describeRun.streamLogPath, describeRun.runId);
+        }
+        // Review pass: posts inline findings (or an LGTM clean summary).
+        if (runReview) {
+            const { prompt: reviewPrompt } = (0, reviewModes_1.buildSkillPrompt)(reviewModes.join(','), promptsDir, actionPath, prefetched);
+            const reviewRun = await runPass('review', reviewPrompt, saveStreamLog);
+            await uploadStreamLog(reviewRun.streamLogPath, reviewRun.runId);
         }
     }
     catch (error) {
@@ -1122,6 +1206,7 @@ exports.SKILL_BY_MODE = exports.ALLOWED_MODES = void 0;
 exports.parseReviewModes = parseReviewModes;
 exports.validateReviewModes = validateReviewModes;
 exports.buildSkillPrompt = buildSkillPrompt;
+exports.buildDescribePrompt = buildDescribePrompt;
 const fs = __importStar(__nccwpck_require__(79896));
 const path = __importStar(__nccwpck_require__(16928));
 exports.ALLOWED_MODES = ['code-review', 'security-review', 'simplify'];
@@ -1178,6 +1263,33 @@ function buildSkillPrompt(modesInput, promptsDir, actionPath, prefetched) {
     return {
         prompt: `${skillLines}\n\n${systemPrompt}${buildPrefetchedSection(prefetched)}`,
         modes,
+    };
+}
+function loadDescribePrompt(promptsDir, actionPath) {
+    const describePath = path.join(promptsDir, 'describe.md');
+    const template = fs.readFileSync(describePath, 'utf-8');
+    return template.replaceAll('{{GITHUB_ACTION_PATH}}', actionPath);
+}
+function buildDescribePrefetchedSection(prefetched) {
+    if (!prefetched) {
+        return '';
+    }
+    const lines = [
+        '<prefetched_pr_data>',
+        'PR context and diff are preloaded below. Treat this as the authoritative scope for the description.',
+        'Use title and existing body as author intent; do not contradict the stated objective.',
+        'When diffMode is hunk_ranges or paths_only, use file paths and diff stats to build the File Walkthrough; read files only if needed.',
+        'Do NOT call post_review in describe mode. Do NOT spawn subagents.',
+        'You MUST call update_pr_description before finishing. Then call set_pr_labels with inferred type + review-effort labels.',
+        '</prefetched_pr_data>',
+        JSON.stringify(prefetched, null, 2),
+    ];
+    return `\n\n${lines.join('\n')}`;
+}
+function buildDescribePrompt(promptsDir, actionPath, prefetched, _labels) {
+    const describeTemplate = loadDescribePrompt(promptsDir, actionPath);
+    return {
+        prompt: `${describeTemplate}${buildDescribePrefetchedSection(prefetched)}`,
     };
 }
 
