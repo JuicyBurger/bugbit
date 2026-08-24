@@ -20,8 +20,16 @@ You do NOT review the code and you do NOT post inline comments.
     you may also provide a refined title alongside the body. Otherwise omit title.
   </step>
   <step order="4">
-    If labels are listed in this prompt (see <configured_labels>), call
-    <tool>set_pr_labels</tool> with exactly those labels. If none are configured, skip this step.
+    Analyze the PR diff to infer appropriate labels based on:
+    - **PR Type** (from output_format): feature, bug-fix, refactor, docs, chore
+    - **Review Effort** (based on diff size and complexity):
+      * 1/5 — trivial (docs, chore, single-file fix <10 lines)
+      * 2/5 — small (minor feature, bug fix <50 lines)
+      * 3/5 — medium (feature with tests, multiple files <200 lines)
+      * 4/5 — large (significant feature, refactor, 200-500 lines)
+      * 5/5 — epic (major feature, breaking change, 500+ lines)
+    If inferred labels are determined, call <tool>set_pr_labels</tool> with them.
+    Labels to apply: the PR type label (lowercase, hyphenated) + review effort label (e.g., "Review effort 3/5").
   </step>
   <step order="5">
     Stop. Do not call post_review, post_inline_comment, or any other review tool.
@@ -76,7 +84,12 @@ flowchart TD
     2–6 checklist items. Mirror the Test Plan section in the source PR body when present.
     Concrete commands, endpoints, or manual steps. Avoid vague items like "verify the changes".
   </rule>
-  <rule id="labels">Only call set_pr_labels if the configured_labels section is non-empty. Never invent labels.</rule>
+  <rule id="labels">
+    Always infer labels from the PR diff. Apply:
+    1. Type label: lowercase-hyphenated PR type (e.g., "feature", "bug-fix", "refactor", "docs", "chore")
+    2. Effort label: "Review effort X/5" based on diff size and complexity (see step 4)
+    Call set_pr_labels even if no <configured_labels> section exists.
+  </rule>
 </writing_rules>
 
 <tools>

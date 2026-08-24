@@ -118,14 +118,10 @@ export function buildDescribePrompt(
   promptsDir: string,
   actionPath: string,
   prefetched?: PrefetchedPrData,
-  labels?: string[],
+  _labels?: string[],
 ): DescribePromptResult {
   const describeTemplate = loadDescribePrompt(promptsDir, actionPath);
-  const labelsSection =
-    labels && labels.length > 0
-      ? `\n\n<configured_labels>\n${labels.join(', ')}\n</configured_labels>\n`
-      : '';
   return {
-    prompt: `${describeTemplate}${labelsSection}${buildDescribePrefetchedSection(prefetched)}`,
+    prompt: `${describeTemplate}${buildDescribePrefetchedSection(prefetched)}`,
   };
 }
