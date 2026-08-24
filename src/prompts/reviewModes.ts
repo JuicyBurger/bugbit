@@ -102,7 +102,7 @@ function buildDescribePrefetchedSection(prefetched?: PrefetchedPrData): string {
     'Use title and existing body as author intent; do not contradict the stated objective.',
     'When diffMode is hunk_ranges or paths_only, use file paths and diff stats to build the File Walkthrough; read files only if needed.',
     'Do NOT call post_review in describe mode. Do NOT spawn subagents.',
-    'You MUST call update_pr_description before finishing. Optionally call set_pr_labels if labels are configured.',
+    'You MUST call update_pr_description before finishing. Then call set_pr_labels with inferred type + review-effort labels.',
     '</prefetched_pr_data>',
     JSON.stringify(prefetched, null, 2),
   ];

@@ -275,6 +275,25 @@ export async function setPrLabels(deps, { labels }) {
   const octokit = createClient(deps.token);
   const { owner, repo } = parseRepo(deps.repository);
 
+  // addLabels 422s if a label name does not exist. Create missing ones so
+  // inferred type / review-effort labels work on first use.
+  for (const name of labels) {
+    try {
+      await octokit.rest.issues.getLabel({ owner, repo, name });
+    } catch (error) {
+      const status = error && typeof error === 'object' && 'status' in error ? error.status : undefined;
+      if (status !== 404) {
+        throw error;
+      }
+      await octokit.rest.issues.createLabel({
+        owner,
+        repo,
+        name,
+        color: 'ededed',
+      });
+    }
+  }
+
   await octokit.rest.issues.addLabels({
     owner,
     repo,

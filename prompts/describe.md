@@ -110,7 +110,7 @@ flowchart TD
   <rule id="no-review-tools">Do not call post_review, post_inline_comment, or any other review tool in this pass.</rule>
   <rule id="no-subagents">Do not spawn task subagents for description generation.</rule>
   <rule id="single-update">Call update_pr_description at most once. Final call wins.</rule>
-  <rule id="labels-guard">Call set_pr_labels at most once, and only if labels are configured.</rule>
+  <rule id="labels-guard">Call set_pr_labels at most once. Always infer type + review-effort labels from the diff; do not wait for a configured_labels block.</rule>
 </constraints>
 
 </bugbit_describe>
