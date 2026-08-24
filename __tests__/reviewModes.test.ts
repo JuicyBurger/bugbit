@@ -17,6 +17,11 @@ function makePromptsDir(): string {
     'System uses get_pr_context tool at {{GITHUB_ACTION_PATH}}',
   );
 
+  fs.writeFileSync(
+    path.join(promptsDir, 'describe.md'),
+    'Describe template at {{GITHUB_ACTION_PATH}}. Output format: PR Type, Description, Diagram Walkthrough, File Walkthrough, Test Plan.',
+  );
+
   return promptsDir;
 }
 

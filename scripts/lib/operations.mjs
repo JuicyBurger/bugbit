@@ -5,7 +5,15 @@ import { mapPullRequestFiles, buildSizedDiff } from './parse-patch.mjs';
 import { fetchDiffLineMap, validateFinding } from './validate.mjs';
 
 /**
- * @typedef {{ token: string, eventPath: string, repository: string, postCleanSummary?: boolean, cleanSummaryBody?: string }} OpsDeps
+ * @typedef {{
+ *   token: string,
+ *   eventPath: string,
+ *   repository: string,
+ *   postCleanSummary?: boolean,
+ *   cleanSummaryBody?: string,
+ *   autoDescribe?: boolean,
+ *   describeLabels?: string[]
+ * }} OpsDeps
  */
 
 /**
@@ -213,4 +221,65 @@ export async function postInlineComment(deps, { path, line, body }) {
     posted: [{ path, line, commentId: data.id }],
     reviewId: null,
   };
+}
+
+/**
+ * Update the PR title and/or body.
+ * @param {OpsDeps} deps
+ * @param {{ title?: string, body: string }} input
+ */
+export async function updatePrDescription(deps, { title, body }) {
+  if (!body || typeof body !== 'string' || body.trim().length === 0) {
+    return {
+      error: {
+        code: 'INVALID_ARGS',
+        message: 'Missing required body',
+      },
+    };
+  }
+
+  const pr = requirePullRequest(deps.eventPath);
+  const octokit = createClient(deps.token);
+  const { owner, repo } = parseRepo(deps.repository);
+
+  const params = {
+    owner,
+    repo,
+    pull_number: pr.number,
+    body,
+  };
+  if (title && typeof title === 'string' && title.trim().length > 0) {
+    params.title = title;
+  }
+
+  const { data } = await octokit.rest.pulls.update(params);
+  return { updated: true, id: data.id };
+}
+
+/**
+ * Apply a list of labels to the PR (uses the issues API, requires issues: write).
+ * @param {OpsDeps} deps
+ * @param {{ labels: string[] }} input
+ */
+export async function setPrLabels(deps, { labels }) {
+  if (!Array.isArray(labels) || labels.length === 0) {
+    return {
+      error: {
+        code: 'INVALID_ARGS',
+        message: 'labels must be a non-empty array',
+      },
+    };
+  }
+
+  const pr = requirePullRequest(deps.eventPath);
+  const octokit = createClient(deps.token);
+  const { owner, repo } = parseRepo(deps.repository);
+
+  await octokit.rest.issues.addLabels({
+    owner,
+    repo,
+    issue_number: pr.number,
+    labels,
+  });
+  return { applied: labels };
 }

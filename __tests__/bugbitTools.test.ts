@@ -29,6 +29,18 @@ export async function postInlineComment(_deps, input) {
   }
   return { posted: true, path: input.path, line: input.line };
 }
+export async function updatePrDescription(_deps, input) {
+  if (!input.body) {
+    return { error: { code: 'INVALID_ARGS', message: 'Missing required body' } };
+  }
+  return { updated: true, id: 999 };
+}
+export async function setPrLabels(_deps, input) {
+  if (!Array.isArray(input.labels) || input.labels.length === 0) {
+    return { error: { code: 'INVALID_ARGS', message: 'labels must be non-empty' } };
+  }
+  return { applied: input.labels };
+}
 `;
 
 const TOOL_NAMES = [
@@ -36,6 +48,8 @@ const TOOL_NAMES = [
   'get_diff',
   'post_review',
   'post_inline_comment',
+  'update_pr_description',
+  'set_pr_labels',
 ] as const;
 
 function setupActionPath(): string {
@@ -63,7 +77,7 @@ describe('createBugbitTools', () => {
     fs.rmSync(actionPath, { recursive: true, force: true });
   });
 
-  it('returns four custom tools with schema and execute handlers', () => {
+  it('returns all custom tools with schema and execute handlers', () => {
     const tools = createBugbitTools({
       githubToken: 'test-token',
       eventPath: '/tmp/event.json',
@@ -145,6 +159,61 @@ describe('createBugbitTools', () => {
     );
     expect(result).toEqual({
       error: { code: 'INVALID_PATH', message: 'path not in diff' },
+    });
+  });
+
+  it('update_pr_description.execute updates the PR body via ops mock', async () => {
+    const tools = createBugbitTools({
+      githubToken: 'test-token',
+      eventPath: '/tmp/event.json',
+      repository: 'owner/repo',
+      actionPath,
+    });
+
+    const result = await tools.update_pr_description.execute({ body: 'new body' }, {});
+    expect(result).toEqual({ updated: true, id: 999 });
+  });
+
+  it('update_pr_description.execute returns error when body is empty', async () => {
+    const tools = createBugbitTools({
+      githubToken: 'test-token',
+      eventPath: '/tmp/event.json',
+      repository: 'owner/repo',
+      actionPath,
+    });
+
+    const result = await tools.update_pr_description.execute({ body: '' }, {});
+    expect(result).toEqual({
+      error: { code: 'INVALID_ARGS', message: 'Missing required body' },
+    });
+  });
+
+  it('set_pr_labels.execute applies labels via ops mock', async () => {
+    const tools = createBugbitTools({
+      githubToken: 'test-token',
+      eventPath: '/tmp/event.json',
+      repository: 'owner/repo',
+      actionPath,
+    });
+
+    const result = await tools.set_pr_labels.execute(
+      { labels: ['enhancement', 'review 4/5'] },
+      {},
+    );
+    expect(result).toEqual({ applied: ['enhancement', 'review 4/5'] });
+  });
+
+  it('set_pr_labels.execute returns error for empty labels array', async () => {
+    const tools = createBugbitTools({
+      githubToken: 'test-token',
+      eventPath: '/tmp/event.json',
+      repository: 'owner/repo',
+      actionPath,
+    });
+
+    const result = await tools.set_pr_labels.execute({ labels: [] }, {});
+    expect(result).toEqual({
+      error: { code: 'INVALID_ARGS', message: 'labels must be non-empty' },
     });
   });
 });

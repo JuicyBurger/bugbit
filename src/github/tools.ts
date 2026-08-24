@@ -17,6 +17,11 @@ type OpsModule = {
     deps: OpsDeps,
     input: { path: string; line: number; body: string },
   ) => Promise<unknown>;
+  updatePrDescription: (
+    deps: OpsDeps,
+    input: { title?: string; body: string },
+  ) => Promise<unknown>;
+  setPrLabels: (deps: OpsDeps, input: { labels: string[] }) => Promise<unknown>;
 };
 
 const opsPromises = new Map<string, Promise<OpsModule>>();
@@ -77,6 +82,8 @@ function toOpsDeps(deps: BugbitToolDeps): OpsDeps {
     repository: deps.repository,
     postCleanSummary: deps.postCleanSummary,
     cleanSummaryBody: deps.cleanSummaryBody,
+    autoDescribe: deps.autoDescribe,
+    describeLabels: deps.describeLabels,
   };
 }
 
@@ -225,6 +232,51 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
           path: args.path as string,
           line: args.line as number,
           body: args.body as string,
+        });
+        return result as SDKJsonValue;
+      },
+    },
+    update_pr_description: {
+      description:
+        'Updates the PR title and/or body with generated description. Requires pull-requests: write.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          body: { type: 'string' },
+        },
+        required: ['body'],
+        additionalProperties: false,
+      },
+      execute: async (args) => {
+        core.info('[bugbit] update_pr_description called');
+        const ops = await loadOps(deps.actionPath);
+        const result = await ops.updatePrDescription(toolDeps, {
+          body: args.body as string,
+          ...(args.title ? { title: args.title as string } : {}),
+        });
+        return result as SDKJsonValue;
+      },
+    },
+    set_pr_labels: {
+      description:
+        'Applies labels to the PR (issues API). Requires issues: write permission.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          labels: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+        required: ['labels'],
+        additionalProperties: false,
+      },
+      execute: async (args) => {
+        core.info(`[bugbit] set_pr_labels called with ${(args.labels as string[]).length} label(s)`);
+        const ops = await loadOps(deps.actionPath);
+        const result = await ops.setPrLabels(toolDeps, {
+          labels: args.labels as string[],
         });
         return result as SDKJsonValue;
       },

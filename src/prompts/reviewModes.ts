@@ -84,3 +84,48 @@ export function buildSkillPrompt(
     modes,
   };
 }
+
+function loadDescribePrompt(promptsDir: string, actionPath: string): string {
+  const describePath = path.join(promptsDir, 'describe.md');
+  const template = fs.readFileSync(describePath, 'utf-8');
+  return template.replaceAll('{{GITHUB_ACTION_PATH}}', actionPath);
+}
+
+function buildDescribePrefetchedSection(prefetched?: PrefetchedPrData): string {
+  if (!prefetched) {
+    return '';
+  }
+
+  const lines = [
+    '<prefetched_pr_data>',
+    'PR context and diff are preloaded below. Treat this as the authoritative scope for the description.',
+    'Use title and existing body as author intent; do not contradict the stated objective.',
+    'When diffMode is hunk_ranges or paths_only, use file paths and diff stats to build the File Walkthrough; read files only if needed.',
+    'Do NOT call post_review in describe mode. Do NOT spawn subagents.',
+    'You MUST call update_pr_description before finishing. Optionally call set_pr_labels if labels are configured.',
+    '</prefetched_pr_data>',
+    JSON.stringify(prefetched, null, 2),
+  ];
+
+  return `\n\n${lines.join('\n')}`;
+}
+
+export interface DescribePromptResult {
+  prompt: string;
+}
+
+export function buildDescribePrompt(
+  promptsDir: string,
+  actionPath: string,
+  prefetched?: PrefetchedPrData,
+  labels?: string[],
+): DescribePromptResult {
+  const describeTemplate = loadDescribePrompt(promptsDir, actionPath);
+  const labelsSection =
+    labels && labels.length > 0
+      ? `\n\n<configured_labels>\n${labels.join(', ')}\n</configured_labels>\n`
+      : '';
+  return {
+    prompt: `${describeTemplate}${labelsSection}${buildDescribePrefetchedSection(prefetched)}`,
+  };
+}

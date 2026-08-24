@@ -100,6 +100,15 @@ jobs:
     #   ## bugbit: LGTM — no findings
     #
     #   No issues reported on this diff.
+
+    # When true, run an additional agent pass first that updates the PR
+    # description with: type, summary bullets, mermaid diagram, file
+    # walkthrough, and test plan. Needs pull-requests: write permission.
+    # auto-describe: true
+
+    # Comma-separated labels to apply after the describe pass.
+    # Needs issues: write permission.
+    # describe-labels: "Review effort 4/5"
 ```
 
 | Input | Required | Default | Notes |
@@ -112,6 +121,8 @@ jobs:
 | `pr-number` | no | — | Required for `workflow_dispatch` when the event has no `pull_request`; ignored otherwise |
 | `post-clean-summary` | no | `true` | Post a visible LGTM COMMENT review when `post_review` receives zero findings |
 | `clean-summary-body` | no | LGTM markdown | Body used for the clean-summary review |
+| `auto-describe` | no | `false` | Run an agent pass that updates the PR body with type, bullets, mermaid diagram, file walkthrough, and test plan |
+| `describe-labels` | no | `''` | Comma-separated labels to apply to the PR after the describe pass |
 
 # Scenarios
 

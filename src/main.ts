@@ -8,7 +8,11 @@ import {
 } from './runtime/artifactUpload';
 import { resolveActionPath } from './runtime/actionPath';
 import { assertRepoCheckedOut } from './runtime/checkCheckout';
-import { buildSkillPrompt } from './prompts/reviewModes';
+import {
+  buildDescribePrompt,
+  buildSkillPrompt,
+  parseReviewModes,
+} from './prompts/reviewModes';
 import {
   checkReviewPermissions,
   copyPermissionsToWorkspace,
@@ -43,6 +47,20 @@ async function run(): Promise<void> {
       core.getInput('clean-summary-body') ||
       '## bugbit: LGTM — no findings\n\nNo issues reported on this diff.';
 
+    const autoDescribe =
+      (core.getInput('auto-describe') || 'false').toString().toLowerCase() === 'true';
+    const describeLabelsRaw = (core.getInput('describe-labels') || '').trim();
+    const describeLabels = describeLabelsRaw
+      .split(',')
+      .map((label) => label.trim())
+      .filter(Boolean);
+
+    if (autoDescribe && describeLabels.length > 0) {
+      core.warning(
+        'describe-labels configured — consumer job must include permissions: issues: write and pull-requests: write',
+      );
+    }
+
     const prNumber = core.getInput('pr-number');
     const rawEventPath = process.env.GITHUB_EVENT_PATH ?? '';
     const repository = process.env.GITHUB_REPOSITORY ?? '';
@@ -72,6 +90,8 @@ async function run(): Promise<void> {
       actionPath,
       postCleanSummary,
       cleanSummaryBody,
+      autoDescribe,
+      describeLabels,
     };
 
     if (saveStreamLog) {
@@ -92,21 +112,44 @@ async function run(): Promise<void> {
     const promptsDir = path.join(actionPath, 'prompts');
 
     const prefetched = await prefetchPrData(toolDeps);
-    const { prompt, modes } = buildSkillPrompt(modesInput, promptsDir, actionPath, prefetched);
-
     const customTools = createBugbitTools(toolDeps);
 
-    core.info(`Starting Cursor agent (model: ${model}, modes: ${modes.join(', ')})`);
-    const { runId, streamLogPath } = await runAgent(
-      apiKey,
-      model,
-      prompt,
-      cwd,
-      customTools,
-      { saveStreamLog },
-    );
+    // Determine which passes to run. `review-modes` defaults to "code-review",
+    // so a pure-describe run must explicitly pass review-modes as an empty string.
+    const reviewModes = parseReviewModes(modesInput);
+    const runDescribe = autoDescribe;
+    const runReview = reviewModes.length > 0;
 
-    if (saveStreamLog && streamLogPath) {
+    if (!runDescribe && !runReview) {
+      core.setFailed(
+        'bugbit has nothing to do: auto-describe is false and review-modes is empty. ' +
+          'Set auto-describe to true and/or provide at least one review-modes value.',
+      );
+      return;
+    }
+
+    async function runPass(
+      label: string,
+      prompt: string,
+      saveLog: boolean,
+    ): Promise<{ runId: string; streamLogPath?: string }> {
+      core.info(`Starting Cursor agent (model: ${model}, pass: ${label})`);
+      const result = await runAgent(
+        apiKey,
+        model,
+        prompt,
+        cwd,
+        customTools,
+        { saveStreamLog: saveLog },
+      );
+      core.info(`${label} pass completed: run ${result.runId}`);
+      return result;
+    }
+
+    async function uploadStreamLog(streamLogPath?: string, runId?: string): Promise<void> {
+      if (!saveStreamLog || !streamLogPath || !runId) {
+        return;
+      }
       try {
         const artifactName = streamLogArtifactName({
           agentRunId: runId,
@@ -117,8 +160,32 @@ async function run(): Promise<void> {
         core.info(`Uploaded stream log artifact "${artifactName}" (id: ${uploadResponse.id ?? 'unknown'})`);
       } catch (error) {
         core.setFailed(artifactUploadErrorMessage(error));
-        return;
+        throw error;
       }
+    }
+
+    // Describe pass: updates the PR body (and optionally labels) before review.
+    if (runDescribe) {
+      const { prompt: describePrompt } = buildDescribePrompt(
+        promptsDir,
+        actionPath,
+        prefetched,
+        describeLabels,
+      );
+      const describeRun = await runPass('describe', describePrompt, saveStreamLog);
+      await uploadStreamLog(describeRun.streamLogPath, describeRun.runId);
+    }
+
+    // Review pass: posts inline findings (or an LGTM clean summary).
+    if (runReview) {
+      const { prompt: reviewPrompt } = buildSkillPrompt(
+        reviewModes.join(','),
+        promptsDir,
+        actionPath,
+        prefetched,
+      );
+      const reviewRun = await runPass('review', reviewPrompt, saveStreamLog);
+      await uploadStreamLog(reviewRun.streamLogPath, reviewRun.runId);
     }
   } catch (error) {
     core.setFailed(error instanceof Error ? error.message : String(error));

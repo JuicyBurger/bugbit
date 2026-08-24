@@ -65,6 +65,20 @@ inputs:
       ## bugbit: LGTM — no findings
 
       No issues reported on this diff.
+  auto-describe:
+    description: >
+      When true, runs an additional agent pass that updates the PR description
+      with type, summary bullets, mermaid diagram, file walkthrough table, and
+      test plan. Requires pull-requests: write permission. Default false.
+    required: false
+    default: 'false'
+  describe-labels:
+    description: >
+      Optional comma-separated label names to apply to the PR after updating the
+      description. Requires issues: write permission on the consumer workflow.
+      Leave empty to skip label application.
+    required: false
+    default: ''
 
 runs:
   using: 'node24'

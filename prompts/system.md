@@ -102,6 +102,10 @@ The target repository is already checked out at the current working directory.
   <rule id="must-post-review">
     You MUST call <tool>post_review</tool> before ending the run, even when there are zero findings.
   </rule>
+  <rule id="no-describe">
+    This prompt is for review mode. Do NOT call <tool>update_pr_description</tool> or <tool>set_pr_labels</tool>
+    in this pass — those are handled by the describe prompt.
+  </rule>
 </constraints>
 
 </bugbit_system>
