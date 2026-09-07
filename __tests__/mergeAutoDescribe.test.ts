@@ -47,4 +47,13 @@ describe('mergeAutoDescribeBody', () => {
     const full = `Keep me\n\n${AUTO_DESCRIBE_START}\n### PR Type\nFeature\n${AUTO_DESCRIBE_END}`;
     expect(stripAutoDescribeSection(full)).toBe('Keep me');
   });
+
+  it('hasAutoDescribeSection detects existing markers', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { hasAutoDescribeSection } = require('../scripts/lib/operations.mjs');
+    expect(hasAutoDescribeSection('plain')).toBe(false);
+    expect(
+      hasAutoDescribeSection(`${AUTO_DESCRIBE_START}\nx\n${AUTO_DESCRIBE_END}`),
+    ).toBe(true);
+  });
 });

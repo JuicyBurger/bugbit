@@ -1039,6 +1039,19 @@ const reviewModes_1 = __nccwpck_require__(42263);
 const tools_1 = __nccwpck_require__(6900);
 const resolveEvent_1 = __nccwpck_require__(95714);
 const sdkBootstrap_1 = __nccwpck_require__(88500);
+const AUTO_DESCRIBE_START = '<!-- bugbit-auto-describe:start -->';
+const AUTO_DESCRIBE_END = '<!-- bugbit-auto-describe:end -->';
+function hasPrefetchedAutoDescribe(prefetched) {
+    const context = prefetched.context;
+    if (!context || typeof context !== 'object') {
+        return false;
+    }
+    const body = context.body;
+    if (typeof body !== 'string') {
+        return false;
+    }
+    return body.includes(AUTO_DESCRIBE_START) && body.includes(AUTO_DESCRIBE_END);
+}
 async function run() {
     try {
         (0, sdkBootstrap_1.bootstrapRipgrep)();
@@ -1110,8 +1123,12 @@ async function run() {
         // Determine which passes to run. `review-modes` defaults to "code-review",
         // so a pure-describe run must explicitly pass review-modes as an empty string.
         const reviewModes = (0, reviewModes_1.parseReviewModes)(modesInput);
-        const runDescribe = autoDescribe;
+        const alreadyDescribed = hasPrefetchedAutoDescribe(prefetched);
+        const runDescribe = autoDescribe && !alreadyDescribed;
         const runReview = reviewModes.length > 0;
+        if (autoDescribe && alreadyDescribed) {
+            core.info('Skipping auto-describe: PR body already has a bugbit auto-describe section. Review will still run.');
+        }
         if (!runDescribe && !runReview) {
             core.setFailed('bugbit has nothing to do: auto-describe is false and review-modes is empty. ' +
                 'Set auto-describe to true and/or provide at least one review-modes value.');

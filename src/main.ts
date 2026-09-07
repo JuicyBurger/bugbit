@@ -20,8 +20,24 @@ import {
   isForkPullRequest,
   prefetchPrData,
 } from './github/tools';
+import type { PrefetchedPrData } from './github/types';
 import { resolveEvent } from './runtime/resolveEvent';
 import { bootstrapRipgrep } from './runtime/sdkBootstrap';
+
+const AUTO_DESCRIBE_START = '<!-- bugbit-auto-describe:start -->';
+const AUTO_DESCRIBE_END = '<!-- bugbit-auto-describe:end -->';
+
+function hasPrefetchedAutoDescribe(prefetched: PrefetchedPrData): boolean {
+  const context = prefetched.context;
+  if (!context || typeof context !== 'object') {
+    return false;
+  }
+  const body = (context as { body?: unknown }).body;
+  if (typeof body !== 'string') {
+    return false;
+  }
+  return body.includes(AUTO_DESCRIBE_START) && body.includes(AUTO_DESCRIBE_END);
+}
 
 async function run(): Promise<void> {
   try {
@@ -117,8 +133,15 @@ async function run(): Promise<void> {
     // Determine which passes to run. `review-modes` defaults to "code-review",
     // so a pure-describe run must explicitly pass review-modes as an empty string.
     const reviewModes = parseReviewModes(modesInput);
-    const runDescribe = autoDescribe;
+    const alreadyDescribed = hasPrefetchedAutoDescribe(prefetched);
+    const runDescribe = autoDescribe && !alreadyDescribed;
     const runReview = reviewModes.length > 0;
+
+    if (autoDescribe && alreadyDescribed) {
+      core.info(
+        'Skipping auto-describe: PR body already has a bugbit auto-describe section. Review will still run.',
+      );
+    }
 
     if (!runDescribe && !runReview) {
       core.setFailed(

@@ -67,9 +67,10 @@ inputs:
       No issues reported on this diff.
   auto-describe:
     description: >
-      When true, runs an additional agent pass that updates the PR description
-      with type, summary bullets, mermaid diagram, file walkthrough table, and
-      test plan. Requires pull-requests: write permission. Default false.
+      When true, runs an additional agent pass that appends a Qodo-style PR
+      description (type, bullets, mermaid, file walkthrough, test plan) after
+      the developer's existing body. Runs once per PR — skipped when the
+      auto-describe markers are already present. Requires pull-requests: write.
     required: false
     default: 'false'
   describe-labels:

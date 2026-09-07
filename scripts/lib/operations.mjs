@@ -21,14 +21,36 @@ import { fetchDiffLineMap, validateFinding } from './validate.mjs';
  */
 export async function getPrContext(deps) {
   const pr = requirePullRequest(deps.eventPath);
+  let title = typeof pr.title === 'string' ? pr.title : '';
+  let body = typeof pr.body === 'string' ? pr.body : '';
+
+  // Prefer live PR fields so synchronize re-runs see prior auto-describe markers.
+  try {
+    const octokit = createClient(deps.token);
+    const { owner, repo } = parseRepo(deps.repository);
+    const { data: livePr } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: pr.number,
+    });
+    if (typeof livePr.title === 'string') {
+      title = livePr.title;
+    }
+    if (typeof livePr.body === 'string') {
+      body = livePr.body;
+    }
+  } catch {
+    // Fall back to event payload.
+  }
+
   return {
     number: pr.number,
     headRef: pr.head.ref,
     baseRef: pr.base.ref,
     headSha: pr.head.sha,
     baseSha: pr.base.sha,
-    title: typeof pr.title === 'string' ? pr.title : '',
-    body: typeof pr.body === 'string' ? pr.body : '',
+    title,
+    body,
   };
 }
 
@@ -228,6 +250,18 @@ export const AUTO_DESCRIBE_START = '<!-- bugbit-auto-describe:start -->';
 export const AUTO_DESCRIBE_END = '<!-- bugbit-auto-describe:end -->';
 
 /**
+ * True when the PR body already contains a bugbit auto-describe block.
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function hasAutoDescribeSection(text) {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+  return text.includes(AUTO_DESCRIBE_START) && text.includes(AUTO_DESCRIBE_END);
+}
+
+/**
  * Remove any previously written auto-describe block from a PR body.
  * @param {string} text
  * @returns {string}
@@ -292,7 +326,8 @@ export async function updatePrDescription(deps, { title, body }) {
   const octokit = createClient(deps.token);
   const { owner, repo } = parseRepo(deps.repository);
 
-  // Prefer live PR body over the workflow event payload so re-runs see prior markers.
+  // Prefer live PR body so re-runs see prior markers (already refreshed in getPrContext,
+  // but re-fetch here as a safety net if the agent somehow still runs describe twice).
   let existingBody = typeof pr.body === 'string' ? pr.body : '';
   try {
     const { data: livePr } = await octokit.rest.pulls.get({
@@ -305,6 +340,21 @@ export async function updatePrDescription(deps, { title, body }) {
     }
   } catch {
     // Fall back to event payload body.
+  }
+
+  // Once-only: if an auto-describe block already exists, keep the body as-is.
+  if (hasAutoDescribeSection(existingBody)) {
+    const params = {
+      owner,
+      repo,
+      pull_number: pr.number,
+    };
+    if (title && typeof title === 'string' && title.trim().length > 0) {
+      params.title = title;
+      const { data } = await octokit.rest.pulls.update(params);
+      return { updated: true, id: data.id, skippedDescribe: true, preservedAuthorBody: true };
+    }
+    return { updated: false, skippedDescribe: true, preservedAuthorBody: true };
   }
 
   const mergedBody = mergeAutoDescribeBody(existingBody, body);

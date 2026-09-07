@@ -29153,6 +29153,7 @@ __nccwpck_require__.d(__webpack_exports__, {
   r$: () => (/* binding */ AUTO_DESCRIBE_START),
   Gw: () => (/* binding */ getDiff),
   C0: () => (/* binding */ getPrContext),
+  cT: () => (/* binding */ hasAutoDescribeSection),
   Tl: () => (/* binding */ mergeAutoDescribeBody),
   Zb: () => (/* binding */ postInlineComment),
   Xc: () => (/* binding */ postReview),
@@ -33844,14 +33845,36 @@ async function fetchDiffLineMap(octokit, owner, repo, pullNumber) {
  */
 async function getPrContext(deps) {
   const pr = requirePullRequest(deps.eventPath);
+  let title = typeof pr.title === 'string' ? pr.title : '';
+  let body = typeof pr.body === 'string' ? pr.body : '';
+
+  // Prefer live PR fields so synchronize re-runs see prior auto-describe markers.
+  try {
+    const octokit = createClient(deps.token);
+    const { owner, repo } = parseRepo(deps.repository);
+    const { data: livePr } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: pr.number,
+    });
+    if (typeof livePr.title === 'string') {
+      title = livePr.title;
+    }
+    if (typeof livePr.body === 'string') {
+      body = livePr.body;
+    }
+  } catch {
+    // Fall back to event payload.
+  }
+
   return {
     number: pr.number,
     headRef: pr.head.ref,
     baseRef: pr.base.ref,
     headSha: pr.head.sha,
     baseSha: pr.base.sha,
-    title: typeof pr.title === 'string' ? pr.title : '',
-    body: typeof pr.body === 'string' ? pr.body : '',
+    title,
+    body,
   };
 }
 
@@ -34051,6 +34074,18 @@ const AUTO_DESCRIBE_START = '<!-- bugbit-auto-describe:start -->';
 const AUTO_DESCRIBE_END = '<!-- bugbit-auto-describe:end -->';
 
 /**
+ * True when the PR body already contains a bugbit auto-describe block.
+ * @param {string} text
+ * @returns {boolean}
+ */
+function hasAutoDescribeSection(text) {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+  return text.includes(AUTO_DESCRIBE_START) && text.includes(AUTO_DESCRIBE_END);
+}
+
+/**
  * Remove any previously written auto-describe block from a PR body.
  * @param {string} text
  * @returns {string}
@@ -34115,7 +34150,8 @@ async function updatePrDescription(deps, { title, body }) {
   const octokit = createClient(deps.token);
   const { owner, repo } = parseRepo(deps.repository);
 
-  // Prefer live PR body over the workflow event payload so re-runs see prior markers.
+  // Prefer live PR body so re-runs see prior markers (already refreshed in getPrContext,
+  // but re-fetch here as a safety net if the agent somehow still runs describe twice).
   let existingBody = typeof pr.body === 'string' ? pr.body : '';
   try {
     const { data: livePr } = await octokit.rest.pulls.get({
@@ -34128,6 +34164,21 @@ async function updatePrDescription(deps, { title, body }) {
     }
   } catch {
     // Fall back to event payload body.
+  }
+
+  // Once-only: if an auto-describe block already exists, keep the body as-is.
+  if (hasAutoDescribeSection(existingBody)) {
+    const params = {
+      owner,
+      repo,
+      pull_number: pr.number,
+    };
+    if (title && typeof title === 'string' && title.trim().length > 0) {
+      params.title = title;
+      const { data } = await octokit.rest.pulls.update(params);
+      return { updated: true, id: data.id, skippedDescribe: true, preservedAuthorBody: true };
+    }
+    return { updated: false, skippedDescribe: true, preservedAuthorBody: true };
   }
 
   const mergedBody = mergeAutoDescribeBody(existingBody, body);
@@ -34197,10 +34248,11 @@ var __webpack_exports__AUTO_DESCRIBE_END = __webpack_exports__.Oi;
 var __webpack_exports__AUTO_DESCRIBE_START = __webpack_exports__.r$;
 var __webpack_exports__getDiff = __webpack_exports__.Gw;
 var __webpack_exports__getPrContext = __webpack_exports__.C0;
+var __webpack_exports__hasAutoDescribeSection = __webpack_exports__.cT;
 var __webpack_exports__mergeAutoDescribeBody = __webpack_exports__.Tl;
 var __webpack_exports__postInlineComment = __webpack_exports__.Zb;
 var __webpack_exports__postReview = __webpack_exports__.Xc;
 var __webpack_exports__setPrLabels = __webpack_exports__.CD;
 var __webpack_exports__stripAutoDescribeSection = __webpack_exports__.Gp;
 var __webpack_exports__updatePrDescription = __webpack_exports__.Gg;
-export { __webpack_exports__AUTO_DESCRIBE_END as AUTO_DESCRIBE_END, __webpack_exports__AUTO_DESCRIBE_START as AUTO_DESCRIBE_START, __webpack_exports__getDiff as getDiff, __webpack_exports__getPrContext as getPrContext, __webpack_exports__mergeAutoDescribeBody as mergeAutoDescribeBody, __webpack_exports__postInlineComment as postInlineComment, __webpack_exports__postReview as postReview, __webpack_exports__setPrLabels as setPrLabels, __webpack_exports__stripAutoDescribeSection as stripAutoDescribeSection, __webpack_exports__updatePrDescription as updatePrDescription };
+export { __webpack_exports__AUTO_DESCRIBE_END as AUTO_DESCRIBE_END, __webpack_exports__AUTO_DESCRIBE_START as AUTO_DESCRIBE_START, __webpack_exports__getDiff as getDiff, __webpack_exports__getPrContext as getPrContext, __webpack_exports__hasAutoDescribeSection as hasAutoDescribeSection, __webpack_exports__mergeAutoDescribeBody as mergeAutoDescribeBody, __webpack_exports__postInlineComment as postInlineComment, __webpack_exports__postReview as postReview, __webpack_exports__setPrLabels as setPrLabels, __webpack_exports__stripAutoDescribeSection as stripAutoDescribeSection, __webpack_exports__updatePrDescription as updatePrDescription };

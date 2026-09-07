@@ -121,7 +121,7 @@ jobs:
 | `pr-number` | no | — | Required for `workflow_dispatch` when the event has no `pull_request`; ignored otherwise |
 | `post-clean-summary` | no | `true` | Post a visible LGTM COMMENT review when `post_review` receives zero findings |
 | `clean-summary-body` | no | LGTM markdown | Body used for the clean-summary review |
-| `auto-describe` | no | `false` | Run an agent pass that appends a Qodo-style section (type, bullets, mermaid, file walkthrough, test plan) after the developer's existing PR body |
+| `auto-describe` | no | `false` | Run an agent pass that appends a Qodo-style section (type, bullets, mermaid, file walkthrough, test plan) after the developer's existing PR body. Runs once per PR (skipped if the auto-describe markers are already present); review still runs on later pushes |
 | `describe-labels` | no | `''` | Comma-separated labels to apply to the PR after the describe pass |
 
 # Scenarios
