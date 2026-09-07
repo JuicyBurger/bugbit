@@ -942,7 +942,7 @@ function createBugbitTools(deps) {
             },
         },
         update_pr_description: {
-            description: 'Updates the PR title and/or body with generated description. Requires pull-requests: write.',
+            description: 'Appends an auto-describe section after the developer PR body (replaces prior auto-describe on re-run). Optionally updates title. Requires pull-requests: write.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -1278,6 +1278,7 @@ function buildDescribePrefetchedSection(prefetched) {
         '<prefetched_pr_data>',
         'PR context and diff are preloaded below. Treat this as the authoritative scope for the description.',
         'Use title and existing body as author intent; do not contradict the stated objective.',
+        'Pass ONLY the auto-describe section to update_pr_description — never rewrite or include the author body; the tool appends after it.',
         'When diffMode is hunk_ranges or paths_only, use file paths and diff stats to build the File Walkthrough; read files only if needed.',
         'Do NOT call post_review in describe mode. Do NOT spawn subagents.',
         'You MUST call update_pr_description before finishing. Then call set_pr_labels with inferred type + review-effort labels.',

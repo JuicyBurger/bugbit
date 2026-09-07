@@ -238,7 +238,7 @@ export function createBugbitTools(deps: BugbitToolDeps): Record<string, SDKCusto
     },
     update_pr_description: {
       description:
-        'Updates the PR title and/or body with generated description. Requires pull-requests: write.',
+        'Appends an auto-describe section after the developer PR body (replaces prior auto-describe on re-run). Optionally updates title. Requires pull-requests: write.',
       inputSchema: {
         type: 'object',
         properties: {

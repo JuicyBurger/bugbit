@@ -223,8 +223,58 @@ export async function postInlineComment(deps, { path, line, body }) {
   };
 }
 
+/** Markers that wrap the auto-describe section so re-runs replace it without touching author text. */
+export const AUTO_DESCRIBE_START = '<!-- bugbit-auto-describe:start -->';
+export const AUTO_DESCRIBE_END = '<!-- bugbit-auto-describe:end -->';
+
+/**
+ * Remove any previously written auto-describe block from a PR body.
+ * @param {string} text
+ * @returns {string}
+ */
+export function stripAutoDescribeSection(text) {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+  const pattern = new RegExp(
+    `${escapeRegExp(AUTO_DESCRIBE_START)}[\\s\\S]*?${escapeRegExp(AUTO_DESCRIBE_END)}\\s*`,
+    'g',
+  );
+  return text.replace(pattern, '').trimEnd();
+}
+
+/**
+ * Merge developer-authored PR body with a newly generated auto-describe section.
+ * Author text is preserved; prior auto-describe blocks are replaced.
+ * @param {string} existingBody
+ * @param {string} generatedBody
+ * @returns {string}
+ */
+export function mergeAutoDescribeBody(existingBody, generatedBody) {
+  const authorPart = stripAutoDescribeSection(existingBody || '').trim();
+  const generated = stripAutoDescribeSection(generatedBody || '').trim();
+  if (!generated) {
+    return authorPart;
+  }
+  const block = `${AUTO_DESCRIBE_START}\n${generated}\n${AUTO_DESCRIBE_END}`;
+  if (!authorPart) {
+    return block;
+  }
+  return `${authorPart}\n\n${block}`;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Update the PR title and/or body.
+ * Body is merged: the developer's existing text is kept, and the generated
+ * auto-describe section is appended (or replaced on re-run).
  * @param {OpsDeps} deps
  * @param {{ title?: string, body: string }} input
  */
@@ -242,18 +292,35 @@ export async function updatePrDescription(deps, { title, body }) {
   const octokit = createClient(deps.token);
   const { owner, repo } = parseRepo(deps.repository);
 
+  // Prefer live PR body over the workflow event payload so re-runs see prior markers.
+  let existingBody = typeof pr.body === 'string' ? pr.body : '';
+  try {
+    const { data: livePr } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: pr.number,
+    });
+    if (typeof livePr.body === 'string') {
+      existingBody = livePr.body;
+    }
+  } catch {
+    // Fall back to event payload body.
+  }
+
+  const mergedBody = mergeAutoDescribeBody(existingBody, body);
+
   const params = {
     owner,
     repo,
     pull_number: pr.number,
-    body,
+    body: mergedBody,
   };
   if (title && typeof title === 'string' && title.trim().length > 0) {
     params.title = title;
   }
 
   const { data } = await octokit.rest.pulls.update(params);
-  return { updated: true, id: data.id };
+  return { updated: true, id: data.id, preservedAuthorBody: Boolean(stripAutoDescribeSection(existingBody).trim()) };
 }
 
 /**
